@@ -1,0 +1,1180 @@
+{
+  "id": "3d566500-43d0-4923-99a5-78fb710a8074",
+  "revision": 0,
+  "last_node_id": 61,
+  "last_link_id": 72,
+  "nodes": [
+    {
+      "id": 55,
+      "type": "ConditioningZeroOut",
+      "pos": [
+        120,
+        680
+      ],
+      "size": [
+        160,
+        30
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 54
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            55
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "ConditioningZeroOut",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        100,
+        560
+      ],
+      "size": [
+        270,
+        60
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            57,
+            59
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "VAELoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "minimax_h3_audio_vae_fp32.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        100,
+        270
+      ],
+      "size": [
+        270,
+        110
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "CLIPLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        100,
+        430
+      ],
+      "size": [
+        270,
+        60
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            56,
+            58
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "VAELoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "minimax_h3_video_vae_int8_convrot.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+      }
+    },
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        100,
+        120
+      ],
+      "size": [
+        270,
+        90
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            66
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "UNETLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "Minimax-h3_Singularity_x_10Eros-Max_PRISM_int8.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "Minimax-h3_Singularity_x_10Eros-Max_PRISM_int8.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 16,
+      "type": "SaveVideo",
+      "pos": [
+        1180,
+        220
+      ],
+      "size": [
+        270,
+        450
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 45
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "SaveVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "video/xxt_variety_s1",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/xxt_variety_s1",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    },
+    {
+      "id": 13,
+      "type": "VAEDecode",
+      "pos": [
+        830,
+        80
+      ],
+      "size": [
+        140,
+        50
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 61
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 56
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "VAEDecode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "VAEDecodeAudio",
+      "pos": [
+        830,
+        180
+      ],
+      "size": [
+        140,
+        50
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 62
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 57
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            44
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "VAEDecodeAudio",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "CreateVideo",
+      "pos": [
+        810,
+        270
+      ],
+      "size": [
+        270,
+        150
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 43
+        },
+        {
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 44
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            45
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "CreateVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        24,
+        8,
+        "sRGB",
+        "none"
+      ],
+      "widgets_values_named": {
+        "fps": 24,
+        "bit_depth": 8,
+        "color_space": "sRGB",
+        "codec": "none"
+      }
+    },
+    {
+      "id": 54,
+      "type": "KSampler",
+      "pos": [
+        810,
+        450
+      ],
+      "size": [
+        270,
+        270
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 67
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 52
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 55
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 60
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            61,
+            62
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "KSampler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        1108164926251196,
+        "randomize",
+        6,
+        1,
+        "res_multistep",
+        "simple",
+        1
+      ],
+      "widgets_values_named": {
+        "seed": 1108164926251196,
+        "control_after_generate": "randomize",
+        "steps": 6,
+        "cfg": 1,
+        "sampler_name": "res_multistep",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    {
+      "id": 7,
+      "type": "MiniMaxH3ReferenceToVideo",
+      "pos": [
+        400,
+        130
+      ],
+      "size": [
+        370,
+        470
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 24
+        },
+        {
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": 58
+        },
+        {
+          "name": "audio_vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": 59
+        },
+        {
+          "name": "ref_images.ref_image_0",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 27
+        },
+        {
+          "name": "ref_images.ref_image_1",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "ref_videos.ref_video_0",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "ref_video_audios.ref_video_audio_0",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "name": "ref_video_audios.ref_video_audio_1",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "name": "ref_audios.ref_audio_0",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": 71
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": 72
+        },
+        {
+          "name": "length",
+          "type": "INT",
+          "widget": {
+            "name": "length"
+          },
+          "link": 65
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            52,
+            54
+          ]
+        },
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            60
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "MiniMaxH3ReferenceToVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "integrated_multimodal_description:\nGlobal visual direction:\nCreative intent: Deliver an intimate, heart-warming moment featuring a gentle feminine character directly communicating warmth and affection.; Look: Cinematic soft-focus portrait visual, realistic skin textures and delicate lighting.; Lighting: Warm golden hour natural daylight streaming through soft curtains.; Palette: Warm beige, soft cream, pastel peach, and glowing amber tones.; Texture: Tactile wool knit texture, soft skin glow, light airy fabric.; Composition: Centered portrait framing with smooth depth of field blurring the background.; Visual motif: Golden sunbeams and gentle direct eye contact.; Continuity: Keep wardrobe, hairstyle, and soft warm lighting tone consistent between shots.\nCamera and performance grammar:\nCamera grammar: Slow, subtle forward push transitions into an intimate close-up framing.; Performance rule: Emphasize realistic micro-expressions, delicate lip movements, and authentic sweet smiles.; Editing rhythm: Calm, continuous flow giving sufficient pacing for clean dialogue delivery.\nTimeline:\n[Shot 1, 0.0-4.5s]; The young woman sits in a sunlit cozy room near a window. She turns her head gently towards the camera, her posture relaxed and welcoming, bringing a soft smile to her face as she leans slightly forward.; Performance: Warm, gentle eye contact with eyes sparkling subtly; a tender, affectionate smile forms naturally on her lips.; Environment: Warm golden afternoon sunlight streams through translucent window curtains, highlighting delicate dust motes softly floating in the air.; Visual: Soft rim lighting catching the strands of her hair; creamy background bokeh.; Medium eye-level shot, slowly pushing forward towards the subject.; Transitions from a gentle lingering gaze into an intimate close-up posture.; Beat: Shot pushes closer as her smile widens warm and inviting.; Transition: Smooth spatial cut matching her subtle tilt of head closer to the camera.; Sound: Soft cozy ambient acoustic guitar melody fades in quietly.\n[Shot 2, 4.5-10.0s]; She tilts her head slightly, rests a hand lightly near her cheek with a sweet expression, and speaks clearly with graceful lip movements.; Performance: Her expression is charming, tender, and deeply affectionate, smiling sweetly while effortlessly speaking the line.; Environment: Golden sunbeams cast a warm glow across her cheek and knit sweater.; Visual: Detailed realistic facial micro-expressions, clear lip movement, warm eye catchlights.; Intimate close-up shot, stable with slight organic hand-held warmth.; Completes speaking the phrase and holds a sweet, lingering smile.; Beat: Dialogue delivery occurs smoothly across the middle of the shot.; Transition: Gently lingers on her adorable smile until a slow dissolve fade out.; Sound: Soft, sweet feminine voice speaking clearly in Chinese: '想我嗎我在等你'.\noverall_soundscape:\nQuiet, cozy sunlit room ambience with gentle indoor acoustics.\nnon_diegetic_music:\nSubtle, romantic acoustic piano and guitar notes playing softly in the background.",
+        640,
+        832,
+        243,
+        "match"
+      ],
+      "widgets_values_named": {
+        "prompt": "integrated_multimodal_description:\nGlobal visual direction:\nCreative intent: Deliver an intimate, heart-warming moment featuring a gentle feminine character directly communicating warmth and affection.; Look: Cinematic soft-focus portrait visual, realistic skin textures and delicate lighting.; Lighting: Warm golden hour natural daylight streaming through soft curtains.; Palette: Warm beige, soft cream, pastel peach, and glowing amber tones.; Texture: Tactile wool knit texture, soft skin glow, light airy fabric.; Composition: Centered portrait framing with smooth depth of field blurring the background.; Visual motif: Golden sunbeams and gentle direct eye contact.; Continuity: Keep wardrobe, hairstyle, and soft warm lighting tone consistent between shots.\nCamera and performance grammar:\nCamera grammar: Slow, subtle forward push transitions into an intimate close-up framing.; Performance rule: Emphasize realistic micro-expressions, delicate lip movements, and authentic sweet smiles.; Editing rhythm: Calm, continuous flow giving sufficient pacing for clean dialogue delivery.\nTimeline:\n[Shot 1, 0.0-4.5s]; The young woman sits in a sunlit cozy room near a window. She turns her head gently towards the camera, her posture relaxed and welcoming, bringing a soft smile to her face as she leans slightly forward.; Performance: Warm, gentle eye contact with eyes sparkling subtly; a tender, affectionate smile forms naturally on her lips.; Environment: Warm golden afternoon sunlight streams through translucent window curtains, highlighting delicate dust motes softly floating in the air.; Visual: Soft rim lighting catching the strands of her hair; creamy background bokeh.; Medium eye-level shot, slowly pushing forward towards the subject.; Transitions from a gentle lingering gaze into an intimate close-up posture.; Beat: Shot pushes closer as her smile widens warm and inviting.; Transition: Smooth spatial cut matching her subtle tilt of head closer to the camera.; Sound: Soft cozy ambient acoustic guitar melody fades in quietly.\n[Shot 2, 4.5-10.0s]; She tilts her head slightly, rests a hand lightly near her cheek with a sweet expression, and speaks clearly with graceful lip movements.; Performance: Her expression is charming, tender, and deeply affectionate, smiling sweetly while effortlessly speaking the line.; Environment: Golden sunbeams cast a warm glow across her cheek and knit sweater.; Visual: Detailed realistic facial micro-expressions, clear lip movement, warm eye catchlights.; Intimate close-up shot, stable with slight organic hand-held warmth.; Completes speaking the phrase and holds a sweet, lingering smile.; Beat: Dialogue delivery occurs smoothly across the middle of the shot.; Transition: Gently lingers on her adorable smile until a slow dissolve fade out.; Sound: Soft, sweet feminine voice speaking clearly in Chinese: '想我嗎我在等你'.\noverall_soundscape:\nQuiet, cozy sunlit room ambience with gentle indoor acoustics.\nnon_diegetic_music:\nSubtle, romantic acoustic piano and guitar notes playing softly in the background.",
+        "width": 640,
+        "height": 832,
+        "length": 243,
+        "ref_image_size": "match"
+      }
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        -200,
+        130
+      ],
+      "size": [
+        270,
+        320
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            27,
+            69
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "LoadImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "LINE_NOTE_251123_1.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "LINE_NOTE_251123_1.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 56,
+      "type": "PrimitiveInt",
+      "pos": [
+        -210,
+        520
+      ],
+      "size": [
+        270,
+        90
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            63
+          ]
+        }
+      ],
+      "title": "Seconds",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0",
+        "Node name for S&R": "PrimitiveInt",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        10,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "value": 10,
+        "fixed": "fixed"
+      },
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 58,
+      "type": "ComfyMathExpression",
+      "pos": [
+        210,
+        760
+      ],
+      "size": [
+        390,
+        140
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "a",
+          "name": "values.a",
+          "type": "FLOAT,INT,BOOLEAN",
+          "link": 63
+        },
+        {
+          "name": "values.b",
+          "shape": 7,
+          "type": "FLOAT,INT,BOOLEAN",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": null
+        },
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            65
+          ]
+        },
+        {
+          "name": "BOOL",
+          "type": "BOOLEAN",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0",
+        "Node name for S&R": "ComfyMathExpression",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17\n"
+      ],
+      "widgets_values_named": {
+        "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17\n"
+      }
+    },
+    {
+      "id": 59,
+      "type": "BlockSparseAttention",
+      "pos": [
+        390,
+        650
+      ],
+      "size": [
+        270,
+        250
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 66
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            67
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "BlockSparseAttention",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "sol-attn",
+        1.3,
+        0.2,
+        1,
+        "",
+        12288,
+        256,
+        "exact_kv_and_rows",
+        false
+      ],
+      "widgets_values_named": {
+        "selection": "sol-attn",
+        "selection.tau": 1.3,
+        "start_percent": 0.2,
+        "end_percent": 1,
+        "dense_blocks": "",
+        "min_tokens": 12288,
+        "extra_tokens": 256,
+        "sink_conditioning": "exact_kv_and_rows",
+        "verbose": false
+      }
+    },
+    {
+      "id": 60,
+      "type": "GetImageSize",
+      "pos": [
+        210,
+        820
+      ],
+      "size": [
+        140,
+        124
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 70
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": [
+            71
+          ]
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": [
+            72
+          ]
+        },
+        {
+          "name": "batch_size",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "GetImageSize",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 61,
+      "type": "ImageScaleToTotalPixels",
+      "pos": [
+        -210,
+        670
+      ],
+      "size": [
+        270,
+        110
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 69
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            70
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "ImageScaleToTotalPixels",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "nearest-exact",
+        0.4,
+        32
+      ],
+      "widgets_values_named": {
+        "upscale_method": "nearest-exact",
+        "megapixels": 0.4,
+        "resolution_steps": 32
+      }
+    }
+  ],
+  "links": [
+    [
+      43,
+      13,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ],
+    [
+      44,
+      14,
+      0,
+      15,
+      1,
+      "AUDIO"
+    ],
+    [
+      52,
+      7,
+      0,
+      54,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      54,
+      7,
+      0,
+      55,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      55,
+      55,
+      0,
+      54,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      56,
+      3,
+      0,
+      13,
+      1,
+      "VAE"
+    ],
+    [
+      57,
+      4,
+      0,
+      14,
+      1,
+      "VAE"
+    ],
+    [
+      60,
+      7,
+      1,
+      54,
+      3,
+      "LATENT"
+    ],
+    [
+      61,
+      54,
+      0,
+      13,
+      0,
+      "LATENT"
+    ],
+    [
+      62,
+      54,
+      0,
+      14,
+      0,
+      "LATENT"
+    ],
+    [
+      67,
+      59,
+      0,
+      54,
+      0,
+      "MODEL"
+    ],
+    [
+      69,
+      5,
+      0,
+      61,
+      0,
+      "IMAGE"
+    ],
+    [
+      70,
+      61,
+      0,
+      60,
+      0,
+      "IMAGE"
+    ],
+    [
+      45,
+      15,
+      0,
+      16,
+      0,
+      "VIDEO"
+    ],
+    [
+      63,
+      56,
+      0,
+      58,
+      0,
+      "INT"
+    ],
+    [
+      66,
+      1,
+      0,
+      59,
+      0,
+      "MODEL"
+    ],
+    [
+      24,
+      2,
+      0,
+      7,
+      0,
+      "CLIP"
+    ],
+    [
+      58,
+      3,
+      0,
+      7,
+      1,
+      "VAE"
+    ],
+    [
+      59,
+      4,
+      0,
+      7,
+      2,
+      "VAE"
+    ],
+    [
+      27,
+      5,
+      0,
+      7,
+      3,
+      "IMAGE"
+    ],
+    [
+      71,
+      60,
+      0,
+      7,
+      9,
+      "INT"
+    ],
+    [
+      72,
+      60,
+      1,
+      7,
+      10,
+      "INT"
+    ],
+    [
+      65,
+      58,
+      1,
+      7,
+      11,
+      "INT"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ue_links": [],
+    "ds": {
+      "scale": 1.5416511549149052,
+      "offset": [
+        222.7065733956937,
+        -104.30520004129706
+      ]
+    },
+    "links_added_by_ue": [],
+    "frontendVersion": "1.55.18",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "extensions": {
+    "widget_idx_map": {
+      "54": {
+        "seed": 0,
+        "sampler_name": 4,
+        "scheduler": 5
+      }
+    },
+    "seed_widgets": {
+      "54": 0
+    }
+  },
+  "version": 0.4
+}

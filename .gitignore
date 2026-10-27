@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+skills/h3-colab-digital-human/references/*.txt
+*.mp4
