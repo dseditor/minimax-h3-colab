@@ -13,7 +13,7 @@ const PLACEHOLDER = {
 const TASK_NAME = { Ref2VA: "參考", T2VA: "純文字", I2VA: "首格", FL2VA: "頭尾格", L2VA: "尾格" };
 
 const state = {
-  library: [], tray: [], libKind: "all", mode: "ref", first: null, last: null,
+  library: [], folders: [], folder: null, tray: [], libKind: "all", mode: "ref", first: null, last: null,
   aspect: "auto", resolution: "720P", intensity: "off",
   config: null, rewriteSig: null, busy: false, jobs: [], seenStatus: {}, videoTab: {},
 };
@@ -50,7 +50,8 @@ function fmtEta(sec) {
 
 // ------------------------------------------------------------ library
 async function loadLibrary() {
-  state.library = await api("/api/library");
+  [state.library, state.folders] = await Promise.all([api("/api/library"), api("/api/folders")]);
+  if (state.folder && !state.folders.some(f => f.id === state.folder)) state.folder = null;
   state.tray = state.tray.filter(t => assetById(t.id));
   if (state.first && !assetById(state.first)) state.first = null;
   if (state.last && !assetById(state.last)) state.last = null;
@@ -71,25 +72,61 @@ function cardActions(a) {
   return btns.join("");
 }
 
+// Folders only exist at the top level. Assets without a folder (or whose folder was deleted) live at the top.
+const folderOf = a => (a.folder && state.folders.some(f => f.id === a.folder) ? a.folder : null);
+
+function renderCrumbs() {
+  const cur = state.folders.find(f => f.id === state.folder);
+  $("#crumbs").innerHTML = `<span class="crumb ${cur ? "" : "cur"}" data-crumb="root" title="把素材拖到這裡可以移出資料夾">🧸 全部素材</span>` +
+    (cur ? ` › <span class="crumb cur">📁 ${esc(cur.name)}</span>` : "");
+}
+
 function renderLibrary() {
-  const items = state.library.filter(a => state.libKind === "all" || a.kind === state.libKind);
-  $("#libGrid").innerHTML = items.map(a => {
+  renderCrumbs();
+  const items = state.library.filter(a => folderOf(a) === state.folder && (state.libKind === "all" || a.kind === state.libKind));
+  const folders = state.folder ? [] : state.folders.map(f => {
+    const inside = state.library.filter(a => folderOf(a) === f.id);
+    const thumbs = inside.filter(a => a.thumb).slice(0, 4);
+    return `<div class="folder" data-folder="${f.id}" title="點開資料夾；把素材拖到這裡就會放進去">
+      <span class="fcount">${inside.length}</span>
+      <div class="ficon ${thumbs.length ? "" : "empty"}">${thumbs.length ? thumbs.map(a => `<i style="background-image:url('/library/${a.thumb}')"></i>`).join("") : "📁"}</div>
+      <div class="fname">📁 ${esc(f.name)}</div>
+      <div class="card-actions"><button class="pill small yellow" data-fact="open">打開</button>
+        <button class="pill small" data-fact="rename">改名</button><button class="pill small" data-fact="delete">刪除</button></div></div>`;
+  });
+  const cards = items.map(a => {
     const inTray = state.mode === "ref" && state.tray.some(t => t.id === a.id);
     const slot = state.mode === "frames" ? (a.id === state.first ? "首格" : a.id === state.last ? "尾格" : "") : "";
     const extra = a.kind === "video" ? ` · ${a.duration}s${a.has_audio ? " · 有聲" : ""}` : "";
-    return `<div class="card ${inTray || slot ? "in-tray" : ""}" data-id="${a.id}">
+    return `<div class="card ${inTray || slot ? "in-tray" : ""}" data-id="${a.id}" draggable="true">
       <span class="kind ${a.kind}">${KIND_LABEL[a.kind]}</span>${slot ? `<span class="badge-on">${slot}</span>` : ""}
       <div class="thumb" ${thumbStyle(a)}>${a.thumb ? "" : KIND_ICON[a.kind]}</div>
       <div class="meta" title="${esc(a.name)}">${esc(a.name)}${extra}</div>
       <div class="card-actions">${cardActions(a)}</div></div>`;
-  }).join("") || `<div class="hint">素材庫是空的，先上傳一些素材吧</div>`;
+  });
+  $("#libGrid").innerHTML = folders.concat(cards).join("") ||
+    `<div class="hint">${state.folder ? "資料夾是空的：把素材拖到上面的「🧸 全部素材」以外的資料夾，或在這裡直接上傳" : "素材庫是空的，先上傳一些素材吧"}</div>`;
+}
+
+async function moveAssets(ids, folder) {
+  state.library = await api("/api/library/move", { ids, folder });
+  renderLibrary();
+  const f = state.folders.find(x => x.id === folder);
+  toast(f ? `放進「${f.name}」了 📁` : "移到全部素材了");
+}
+
+async function folderAction(body) {
+  state.folders = await api("/api/folders", body);
+  if (body.action === "delete") state.library = await api("/api/library");
+  renderLibrary();
 }
 
 async function uploadFiles(files) {
   for (const f of files) {
     try {
       toast(`上傳中：${f.name}`);
-      const item = await api("/api/upload", f, { "X-Filename": encodeURIComponent(f.name), "Content-Type": "application/octet-stream" });
+      const item = await api("/api/upload", f, { "X-Filename": encodeURIComponent(f.name), "X-Folder": state.folder || "",
+        "Content-Type": "application/octet-stream" });
       state.library.unshift(item);
     } catch (e) { toast(`${f.name} 上傳失敗：${e.message}`, true); }
   }
@@ -279,7 +316,7 @@ function requestBody() {
     mode: state.mode, prompt: $("#prompt").value, tray: state.mode === "ref" ? state.tray : [],
     first_id: state.mode === "frames" ? state.first : null, last_id: state.mode === "frames" ? state.last : null,
     seconds: +$("#seconds").value, aspect: state.aspect, resolution: state.resolution, intensity: state.intensity,
-    skill: $("#skill").value, seed: $("#seed").value === "" ? null : +$("#seed").value,
+    skill: $("#skill").value, seed: $("#seed").value === "" ? null : +$("#seed").value, fast: $("#fastMode").checked,
   };
 }
 const signature = () => { const b = requestBody(); return JSON.stringify([b.mode, b.prompt, b.tray, b.first_id, b.last_id, b.seconds, b.skill]); };
@@ -490,14 +527,21 @@ async function loadConfig() {
 
 // The rewriter is optional (Colab can skip its 7 GB download): without it, the switch turns off.
 async function checkRewriter() {
-  let models = [];
-  try { models = await api("/api/models"); } catch (e) { return; }
-  const ok = models.includes(state.config.config.rewriter.model);
+  const rw = state.config.config.rewriter;
+  let ok = rw.provider && rw.provider !== "local";
+  if (!ok) {
+    let models = [];
+    try { models = await api("/api/models"); } catch (e) { return; }
+    ok = models.includes(rw.model);
+  }
   const sw = $("#useRewrite");
-  sw.disabled = !ok;
   if (!ok) sw.checked = false;
+  else if (sw.disabled) sw.checked = true;
+  sw.disabled = !ok;
   $("#btnRewrite").disabled = !ok;
-  sw.closest("label").title = ok ? "" : "沒有安裝提示詞改寫模型，會直接用你寫的描述生成";
+  sw.closest("label").title = ok ? "" : "沒有安裝本地改寫模型：可以在設定改用 Gemini 或 OpenAI 端點，或直接用你寫的描述生成";
+  const name = { local: "本地小模型", gemini: "Gemini", openai: "OpenAI 端點" }[rw.provider || "local"];
+  sw.closest("label").lastChild.textContent = ` ✨ 提示詞改寫（${name}）`;
 }
 
 function syncSegs() {
@@ -505,18 +549,44 @@ function syncSegs() {
     for (const b of $(id).children) b.classList.toggle("active", b.dataset.v === state[key]);
 }
 
+const GEMINI_DEFAULTS = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
+
+function setDatalist(id, names) {
+  $(id).innerHTML = [...new Set(names)].map(n => `<option value="${esc(n)}">`).join("");
+}
+
+function showProvider(p) {
+  for (const r of document.querySelectorAll("[name=provider]")) r.checked = r.value === p;
+  for (const el of document.querySelectorAll(".prov-panel")) el.classList.toggle("on", el.dataset.panel === p);
+}
+
+function keyPlaceholder(el, has) {
+  el.value = "";
+  el.dataset.clear = "";
+  el.placeholder = has ? "已儲存（留空＝繼續使用）" : "貼上 API 金鑰";
+}
+
 async function openSettings() {
   const { config: c, lora_nodes } = state.config;
+  const rw = c.rewriter;
   let models = [];
   try { models = await api("/api/models"); } catch (e) { toast(e.message, true); }
-  if (!models.includes(c.rewriter.model)) models.unshift(c.rewriter.model);
-  $("#cfgModel").innerHTML = models.map(m => `<option ${m === c.rewriter.model ? "selected" : ""}>${esc(m)}</option>`).join("");
-  $("#cfgThinking").checked = c.rewriter.thinking;
-  $("#cfgMtp").value = c.rewriter.mtp;
-  $("#cfgMaxLen").value = c.rewriter.max_length;
-  $("#cfgTemp").value = c.rewriter.temperature;
-  $("#cfgTopP").value = c.rewriter.top_p;
-  $("#cfgSide").value = c.rewriter.image_side;
+  if (!models.includes(rw.model)) models.unshift(rw.model);
+  $("#cfgModel").innerHTML = models.map(m => `<option ${m === rw.model ? "selected" : ""}>${esc(m)}</option>`).join("");
+  $("#cfgThinking").checked = rw.thinking;
+  $("#cfgMtp").value = rw.mtp;
+  $("#cfgMaxLen").value = rw.max_length;
+  $("#cfgTemp").value = rw.temperature;
+  $("#cfgTopP").value = rw.top_p;
+  $("#cfgSide").value = rw.image_side;
+  keyPlaceholder($("#cfgGemKey"), rw.gemini.has_key);
+  $("#cfgGemModel").value = rw.gemini.model || GEMINI_DEFAULTS[0];
+  setDatalist("#gemModels", GEMINI_DEFAULTS);
+  $("#cfgOaUrl").value = rw.openai.base_url || "";
+  keyPlaceholder($("#cfgOaKey"), rw.openai.has_key);
+  $("#cfgOaModel").value = rw.openai.model || "";
+  for (const id of ["#gemResult", "#oaResult"]) { $(id).textContent = ""; $(id).className = "vres"; }
+  showProvider(rw.provider || "local");
   $("#cfgUrl").value = c.comfy_url;
   $("#cfgLoras").innerHTML = lora_nodes.map(l => `
     <div class="lora-row"><span class="lname" title="${esc(l.name)}">${esc(l.name)} <span class="hint">×${(+l.strength).toFixed(2)}</span></span>
@@ -524,12 +594,35 @@ async function openSettings() {
   $("#settings").showModal();
 }
 
+function keyValue(el) { return el.dataset.clear ? "__CLEAR__" : el.value.trim(); }
+
+function providerForm(p) {
+  if (p === "gemini") return { api_key: $("#cfgGemKey").value.trim(), model: $("#cfgGemModel").value.trim() };
+  return { base_url: $("#cfgOaUrl").value.trim(), api_key: $("#cfgOaKey").value.trim(), model: $("#cfgOaModel").value.trim() };
+}
+
+async function verifyProvider(p) {
+  const out = $(p === "gemini" ? "#gemResult" : "#oaResult");
+  out.className = "vres"; out.textContent = "連線中…";
+  try {
+    const r = await api("/api/rewriter/test", { provider: p, conf: providerForm(p) });
+    out.className = "vres ok";
+    out.textContent = `✅ 端點活著（${(r.ms / 1000).toFixed(1)} 秒，回覆「${r.reply}」）` + (r.models.length ? `，清單抓到 ${r.models.length} 個模型` : "");
+    if (r.models.length) setDatalist(p === "gemini" ? "#gemModels" : "#oaModels", (p === "gemini" ? GEMINI_DEFAULTS : []).concat(r.models));
+  } catch (e) {
+    out.className = "vres bad"; out.textContent = "❌ " + e.message;
+  }
+}
+
 async function saveSettings() {
   const c = structuredClone(state.config.config);
+  const provider = document.querySelector("[name=provider]:checked")?.value || "local";
   Object.assign(c.rewriter, {
-    model: $("#cfgModel").value, thinking: $("#cfgThinking").checked, mtp: $("#cfgMtp").value,
+    provider, model: $("#cfgModel").value, thinking: $("#cfgThinking").checked, mtp: $("#cfgMtp").value,
     max_length: +$("#cfgMaxLen").value, temperature: +$("#cfgTemp").value, top_p: +$("#cfgTopP").value,
     image_side: +$("#cfgSide").value,
+    gemini: { api_key: keyValue($("#cfgGemKey")), model: $("#cfgGemModel").value.trim() || GEMINI_DEFAULTS[0] },
+    openai: { base_url: $("#cfgOaUrl").value.trim(), api_key: keyValue($("#cfgOaKey")), model: $("#cfgOaModel").value.trim() },
   });
   c.comfy_url = $("#cfgUrl").value.trim();
   const sel = [...document.querySelectorAll("[data-lora]")];
@@ -553,9 +646,53 @@ async function checkComfy() {
 function bind() {
   $("#fileInput").addEventListener("change", e => { uploadFiles([...e.target.files]); e.target.value = ""; });
   const dz = $("#dropZone");
-  for (const ev of ["dragenter", "dragover"]) document.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("over"); });
+  const isFiles = e => [...(e.dataTransfer?.types || [])].includes("Files");
+  for (const ev of ["dragenter", "dragover"]) document.addEventListener(ev, e => { e.preventDefault(); if (isFiles(e)) dz.classList.add("over"); });
   for (const ev of ["dragleave", "drop"]) document.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("over"); });
-  document.addEventListener("drop", e => e.dataTransfer.files.length && uploadFiles([...e.dataTransfer.files]));
+  document.addEventListener("drop", e => isFiles(e) && e.dataTransfer.files.length && uploadFiles([...e.dataTransfer.files]));
+
+  // library folders: drag a card onto a folder (or onto 🧸 全部素材 to take it out)
+  const lib = $(".library");
+  lib.addEventListener("dragstart", e => {
+    const card = e.target.closest?.(".card");
+    if (!card) return;
+    e.dataTransfer.setData("application/x-h3t-asset", card.dataset.id);
+    e.dataTransfer.effectAllowed = "move";
+    card.classList.add("dragging");
+  });
+  lib.addEventListener("dragend", e => e.target.closest?.(".card")?.classList.remove("dragging"));
+  const dropTarget = e => e.target.closest?.(".folder, [data-crumb=root]");
+  lib.addEventListener("dragover", e => {
+    const t = dropTarget(e);
+    if (t && [...e.dataTransfer.types].includes("application/x-h3t-asset")) { e.preventDefault(); t.classList.add("drop"); }
+  });
+  lib.addEventListener("dragleave", e => dropTarget(e)?.classList.remove("drop"));
+  lib.addEventListener("drop", e => {
+    const t = dropTarget(e);
+    const id = e.dataTransfer.getData("application/x-h3t-asset");
+    if (!t || !id) return;
+    e.preventDefault();
+    t.classList.remove("drop");
+    moveAssets([id], t.dataset.folder || null).catch(err => toast(err.message, true));
+  });
+  $("#crumbs").addEventListener("click", e => { if (e.target.dataset.crumb === "root") { state.folder = null; renderLibrary(); } });
+  $("#btnNewFolder").addEventListener("click", () => {
+    const name = prompt("資料夾名稱（例：第三晚短劇、角色定裝）", "新資料夾");
+    if (name !== null) folderAction({ action: "create", name }).catch(err => toast(err.message, true));
+  });
+
+  // settings: provider tabs, verify, clear stored keys, fast-mode hint
+  $("#cfgProvider").addEventListener("change", e => showProvider(e.target.value));
+  $("#settings").addEventListener("click", e => {
+    if (e.target.dataset.verify) verifyProvider(e.target.dataset.verify);
+    const k = e.target.dataset.clearKey;
+    if (k) {
+      const el = $(k === "gemini" ? "#cfgGemKey" : "#cfgOaKey");
+      el.value = ""; el.dataset.clear = "1"; el.placeholder = "儲存後會刪除已存的金鑰";
+    }
+  });
+  for (const id of ["#cfgGemKey", "#cfgOaKey"]) $(id).addEventListener("input", e => (e.target.dataset.clear = ""));
+  $("#fastMode").addEventListener("change", e => ($("#fastHint").textContent = e.target.checked ? "8 步" : "12 步"));
 
   $("#modeTabs").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) setMode(b.dataset.mode); });
   $("#libTabs").addEventListener("click", e => {
@@ -565,6 +702,20 @@ function bind() {
     renderLibrary();
   });
   $("#libGrid").addEventListener("click", async e => {
+    const folderEl = e.target.closest(".folder");
+    if (folderEl) {
+      const fid = folderEl.dataset.folder;
+      const fact = e.target.dataset.fact || "open";
+      const f = state.folders.find(x => x.id === fid);
+      if (fact === "open") { state.folder = fid; renderLibrary(); }
+      if (fact === "rename") {
+        const name = prompt("新的資料夾名稱", f.name);
+        if (name) folderAction({ action: "rename", id: fid, name }).catch(err => toast(err.message, true));
+      }
+      if (fact === "delete" && confirm(`刪除資料夾「${f.name}」？裡面的素材不會被刪，會移回全部素材。`))
+        folderAction({ action: "delete", id: fid }).catch(err => toast(err.message, true));
+      return;
+    }
     const act = e.target.dataset.act;
     const id = e.target.closest(".card")?.dataset.id;
     if (act === "add") addToTray(id);
@@ -638,7 +789,7 @@ function bind() {
       if (act === "copy") { await navigator.clipboard.writeText(job.final_prompt); toast("已複製"); }
       if (act === "tolib") {
         toast("加入素材庫中…");
-        const item = await api("/api/library/from_job", { id: job.id });
+        const item = await api("/api/library/from_job", { id: job.id, folder: state.folder });
         state.library.unshift(item);
         renderLibrary();
         toast("已加入素材庫，可以拿來延伸或當參考 🧵");

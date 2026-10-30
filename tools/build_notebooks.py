@@ -328,7 +328,9 @@ TOYBOX = [
 - 🎞 **頭尾格**：只放首格、只放尾格、或兩張都放
 - ✏️ **純文字**：只靠一段描述
 - 🧵 **延伸影片**：參考影片勾「延伸這支影片」，新片段會從它的最後一格接下去，並自動接回原片
-- ✨ **提示詞改寫**：用 H3 官方的 9B 改寫模型把中文描述擴寫成 H3 規格的英文提示詞（改寫結果預設收起來）
+- ✨ **提示詞改寫**：把中文描述擴寫成 H3 規格的英文提示詞（改寫結果預設收起來）。預設用 H3 官方的 9B 改寫模型；也可以在 ⚙ 設定改用 **Gemini** 或 **OpenAI 相容端點**
+- ⚡ **快速模式**（預設開）：8 步出片；關掉是 12 步
+- 📁 **素材庫資料夾**：把圖片、影片、聲音拖進資料夾整理
 - 每支影片都會顯示目前做到哪一步、還要多久
 
 **Hugging Face 權杖（建議）**：左側欄「🔑 密鑰」新增 `HF_TOKEN`（請用**唯讀**權杖），並開啟「筆記本存取權」。
@@ -395,7 +397,7 @@ print('✅ 安裝完成')
 # 只有在 Hugging Face 撞到流量上限時，才勾選 USE_DRIVE_CACHE：
 #   勾選後會從「我的雲端硬碟/H3_models」複製（比 HF 慢），雲端硬碟沒有的檔案才去 HF 抓並順便存一份。
 USE_DRIVE_CACHE = False  #@param {type:"boolean"}
-#@markdown 不勾就少下載 7 GB，網頁裡的「提示詞改寫」會自動關掉，直接用你寫的描述生成。
+#@markdown 不勾就少下載 7 GB：網頁的本地改寫會關掉，可以到 ⚙ 設定改用 Gemini 或 OpenAI 端點改寫。
 INCLUDE_REWRITER = True  #@param {type:"boolean"}
 from huggingface_hub import hf_hub_download
 import shutil, time

@@ -13,6 +13,7 @@ then open http://127.0.0.1:8190
 """
 import base64
 import copy
+import io
 import json
 import mimetypes
 import os
@@ -40,6 +41,7 @@ LIBRARY = ROOT / "library"
 OUTPUTS = ROOT / "outputs"
 CONFIG_PATH = ROOT / "config.json"
 JOBS_PATH = ROOT / "jobs.json"
+FOLDERS_PATH = ROOT / "library" / "folders.json"
 STATS_PATH = ROOT / "stats.json"
 TEMPLATE_PATH = ROOT / "WF.json"
 PORT = int(os.environ.get("H3TOYBOX_PORT", 8190))
@@ -67,7 +69,13 @@ DEFAULT_CONFIG = {
         "top_k": 20,
         "image_side": 768,
         "video_frames": 8,
+        # local = the quantized H3 rewriter inside ComfyUI; gemini / openai = remote endpoints
+        "provider": "local",
+        "gemini": {"api_key": "", "model": "gemini-3.8-flash"},
+        "openai": {"base_url": "", "api_key": "", "model": ""},
     },
+    # 快速模式 (default on): fewer SelfLift steps, half at low resolution and half at high
+    "steps": {"normal": [12, 6], "fast": [8, 4]},
     # LoRA node ids in WF.json. "drama" LoRAs always apply; "action" LoRAs apply only
     # when motion intensity is on, with strength = template strength * multiplier.
     "loras": {
@@ -132,16 +140,45 @@ def save_json(path, data):
     tmp.replace(path)
 
 
+def deep_merge(base, extra):
+    for k, v in extra.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            deep_merge(base[k], v)
+        else:
+            base[k] = v
+    return base
+
+
 def load_config():
-    cfg = copy.deepcopy(DEFAULT_CONFIG)
     saved = load_json(CONFIG_PATH, {})
     saved.pop("guide_path", None)  # H3 Studio's single-guide key
-    for k, v in saved.items():
-        if isinstance(v, dict) and isinstance(cfg.get(k), dict):
-            cfg[k].update(v)
-        else:
-            cfg[k] = v
-    return cfg
+    return deep_merge(copy.deepcopy(DEFAULT_CONFIG), saved)
+
+
+API_KEYS = (("rewriter", "gemini"), ("rewriter", "openai"))
+
+
+def public_config(cfg):
+    """Config for the browser: API keys are never sent back, only whether one is stored."""
+    out = copy.deepcopy(cfg)
+    for a, b in API_KEYS:
+        sect = out[a][b]
+        sect["has_key"] = bool(sect.get("api_key"))
+        sect["api_key"] = ""
+    return out
+
+
+def save_config(new):
+    """An empty api_key from the form keeps the stored key; "__CLEAR__" removes it."""
+    old = load_config()
+    new = {k: new[k] for k in DEFAULT_CONFIG if k in new}
+    for a, b in API_KEYS:
+        sect = new.get(a, {}).get(b)
+        if isinstance(sect, dict):
+            sect.pop("has_key", None)
+            key = sect.get("api_key", "")
+            sect["api_key"] = "" if key == "__CLEAR__" else key.strip() or old[a][b].get("api_key", "")
+    save_json(CONFIG_PATH, deep_merge(load_json(CONFIG_PATH, {}), new))
 
 
 # ---------------------------------------------------------------- ComfyUI client
@@ -448,7 +485,7 @@ def last_frame(path):
     return frame.to_image()
 
 
-def add_asset(cfg, filename, body):
+def add_asset(cfg, filename, body, folder=None):
     ext = Path(filename).suffix.lower()
     kind = "image" if ext in IMAGE_EXT else "video" if ext in VIDEO_EXT else "audio" if ext in AUDIO_EXT else None
     if kind is None:
@@ -458,7 +495,7 @@ def add_asset(cfg, filename, body):
     stored = LIBRARY / f"{asset_id}{ext}"
     stored.write_bytes(body)
     item = {"id": asset_id, "name": Path(filename).name, "kind": kind, "file": stored.name,
-            "comfy_name": f"h3fe_{asset_id}{ext}", "created": time.time()}
+            "comfy_name": f"h3fe_{asset_id}{ext}", "created": time.time(), "folder": folder or None}
     thumb = LIBRARY / f"{asset_id}_thumb.jpg"
     if kind == "image":
         with Image.open(stored) as im:
@@ -484,7 +521,7 @@ def add_asset(cfg, filename, body):
     return item
 
 
-def add_output_to_library(cfg, job_id):
+def add_output_to_library(cfg, job_id, folder=None):
     job = next((j for j in load_json(JOBS_PATH, []) if j["id"] == job_id), None)
     if not job or job.get("status") != "done":
         raise ValueError("這個工作還沒有完成的影片")
@@ -496,7 +533,7 @@ def add_output_to_library(cfg, job_id):
         comfy_download(cfg, v, tmp)
         body, name = tmp.read_bytes(), v["filename"]
         tmp.unlink(missing_ok=True)
-    return add_asset(cfg, name, body)
+    return add_asset(cfg, name, body, folder)
 
 
 def delete_asset(cfg, asset_id):
@@ -511,6 +548,43 @@ def delete_asset(cfg, asset_id):
         if name:
             (LIBRARY / name).unlink(missing_ok=True)
     (Path(cfg["comfy_input_dir"]) / item["comfy_name"]).unlink(missing_ok=True)
+
+
+def folder_action(b):
+    """Create / rename / delete a library folder. Deleting a folder moves its assets back to the top level."""
+    with lock:
+        folders = load_json(FOLDERS_PATH, [])
+        act = b.get("action")
+        if act == "create":
+            name = (b.get("name") or "").strip() or "新資料夾"
+            folders.append({"id": uuid.uuid4().hex[:8], "name": name[:40], "created": time.time()})
+        elif act == "rename":
+            for f in folders:
+                if f["id"] == b.get("id"):
+                    f["name"] = ((b.get("name") or "").strip() or f["name"])[:40]
+        elif act == "delete":
+            folders = [f for f in folders if f["id"] != b.get("id")]
+            index = library_index()
+            for item in index:
+                if item.get("folder") == b.get("id"):
+                    item["folder"] = None
+            save_json(LIBRARY / "library.json", index)
+        else:
+            raise ValueError("未知的資料夾動作")
+        save_json(FOLDERS_PATH, folders)
+        return folders
+
+
+def move_assets(ids, folder):
+    with lock:
+        if folder and folder not in {f["id"] for f in load_json(FOLDERS_PATH, [])}:
+            raise ValueError("資料夾不存在")
+        index = library_index()
+        for item in index:
+            if item["id"] in ids:
+                item["folder"] = folder or None
+        save_json(LIBRARY / "library.json", index)
+        return index
 
 
 # ---------------------------------------------------------------- references
@@ -699,12 +773,15 @@ def raw_prompt(text, task, duration, chosen, src):
     return (head + "\n\n" if head else "") + text
 
 
-def build_rewrite(cfg, tagged_text, chosen, task, duration, skill_id, job_id, src):
-    """Raw Qwen3.5 chat text + vision images, matching post_vllm.build_messages ordering."""
+def rewrite_message(cfg, tagged_text, chosen, task, duration, skill_id, src):
+    """The rewriter's input as (system text, user parts), parts = [("text", str) | ("image", PIL.Image)].
+
+    Order and wording follow post_vllm.build_messages, so every backend sees the same message.
+    """
     rw = cfg["rewriter"]
     side = int(rw["image_side"])
     names = ({"Subject": "主体", "Picture": "图片", "Video": "视频", "Audio": "音频"}
-             if re.search(r"[\u3400-\u9fff]", tagged_text) else
+             if re.search(r"[㐀-鿿]", tagged_text) else
              {"Subject": "subject ", "Picture": "image ", "Video": "video ", "Audio": "audio "})
     original = re.sub(r"<(Subject|Picture|Video|Audio)\s+(\d+)>", lambda m: names[m[1]] + m[2], tagged_text.strip())
 
@@ -738,36 +815,52 @@ def build_rewrite(cfg, tagged_text, chosen, task, duration, skill_id, job_id, sr
                  f"output format, reference labels, dialogue or duration:\n{skill}\n")
     text += f"Original prompt:\n{original}\n"
 
-    images = []
+    parts = []
     for kind in ("image", "video", "audio"):
         for i, item in enumerate(chosen[kind], start=1):
             label = f"<{LABEL[kind]} {i}>"
             text += f"{CHINESE_NAME[kind]}{i} / reference {kind} {i}: {label}."
             if kind == "image":
                 with Image.open(media_path(item)) as im:
-                    images.append(pad_square(im, side))
-                text += VISION
+                    parts += [("text", text), ("image", pad_square(im, side))]
+                text = ""
             elif kind == "video":
                 src_duration, frames = video_frames(media_path(item), int(rw["video_frames"]))
                 text += f"{label} duration: {src_duration:.6f}s. Frames follow in source order."
                 for ts, im in frames:
-                    images.append(pad_square(im, side))
-                    text += f"{label} frame near source time {ts:.6f}s." + VISION
+                    text += f"{label} frame near source time {ts:.6f}s."
+                    parts += [("text", text), ("image", pad_square(im, side))]
+                    text = ""
+    if text:
+        parts.append(("text", text))
 
     if task == "Ref2VA":
         system = SYSTEM_REF + Path(cfg["guides"]["ref"]).read_text(encoding="utf-8")
     else:
         system = SYSTEM_BASE.format(task=task) + Path(cfg["guides"]["base"]).read_text(encoding="utf-8")
-    raw = (f"<|im_start|>system\n{system.strip()}<|im_end|>\n"
-           f"<|im_start|>user\n{text.strip()}<|im_end|>\n<|im_start|>assistant\n")
-    raw += "<think>\n" if rw["thinking"] else "<think>\n\n</think>\n\n"
+    return system.strip(), parts
 
+
+def jpeg_b64(im):
+    buf = io.BytesIO()
+    im.save(buf, format="JPEG", quality=90)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def rewrite_local(cfg, system, parts, job_id):
+    """ComfyUI TextGenerate with the quantized H3 rewriter: raw Qwen3.5 chat text + vision images."""
+    rw = cfg["rewriter"]
+    body = "".join(p if kind == "text" else VISION for kind, p in parts)
+    raw = (f"<|im_start|>system\n{system}<|im_end|>\n"
+           f"<|im_start|>user\n{body.strip()}<|im_end|>\n<|im_start|>assistant\n")
+    raw += "<think>\n" if rw["thinking"] else "<think>\n\n</think>\n\n"
     inp = Path(cfg["comfy_input_dir"])
     wf = {"1": {"class_type": "CLIPLoader", "inputs": {"clip_name": rw["model"], "type": "stable_diffusion", "device": "default"}}}
-    batch = None
-    for n, im in enumerate(images):
+    batch, names = None, []
+    for n, im in enumerate(p for kind, p in parts if kind == "image"):
         name = f"h3fe_rw_{job_id}_{n}.jpg"
         im.save(inp / name, quality=92)
+        names.append(name)
         wf[f"i{n}"] = {"class_type": "LoadImage", "inputs": {"image": name}}
         if batch is None:
             batch = [f"i{n}", 0]
@@ -784,26 +877,102 @@ def build_rewrite(cfg, tagged_text, chosen, task, duration, skill_id, job_id, sr
         gen["image"] = batch
     wf["2"] = {"class_type": "TextGenerate", "inputs": gen}
     wf["3"] = {"class_type": "PreviewAny", "inputs": {"source": ["2", 0]}}
-    return wf, len(images)
-
-
-def rewrite(cfg, req):
-    tagged, chosen, task, src = collect(cfg, req, req["prompt"])
-    job_id = uuid.uuid4().hex[:8]
-    duration = float(req["seconds"])
-    wf, n_images = build_rewrite(cfg, tagged, chosen, task, duration, req.get("skill"), job_id, src)
-    t0 = time.time()
     try:
         entry = wait_prompt(cfg, queue_prompt(cfg, wf))
     finally:
-        for n in range(n_images):
-            (Path(cfg["comfy_input_dir"]) / f"h3fe_rw_{job_id}_{n}.jpg").unlink(missing_ok=True)
-    text = "".join(entry["outputs"].get("3", {}).get("text", [])).strip()
+        for name in names:
+            (inp / name).unlink(missing_ok=True)
     if cfg.get("free_after_rewrite"):
         try:
             comfy(cfg, "/free", {"unload_models": True, "free_memory": True})
         except Exception:
             pass
+    return "".join(entry["outputs"].get("3", {}).get("text", [])).strip()
+
+
+def http_json(url, payload=None, headers=None, timeout=300):
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="POST" if data else "GET",
+                                 headers={"Content-Type": "application/json", **(headers or {})})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")
+        try:
+            parsed = json.loads(detail)
+            if isinstance(parsed, list) and parsed:  # Google's OpenAI-compatible endpoint wraps errors in a list
+                parsed = parsed[0]
+            err = parsed.get("error", detail)
+            detail = err.get("message", err) if isinstance(err, dict) else err
+        except (ValueError, AttributeError):
+            pass
+        raise RuntimeError(f"HTTP {e.code}：{str(detail)[:600]}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"連不上端點：{e.reason}")
+
+
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+
+def rewrite_gemini(gm, rw, system, parts, max_tokens=None):
+    if not gm.get("api_key"):
+        raise ValueError("還沒有填 Gemini API 金鑰")
+    model = (gm.get("model") or "gemini-3.8-flash").strip()
+    contents = [{"text": p} if kind == "text" else {"inline_data": {"mime_type": "image/jpeg", "data": jpeg_b64(p)}}
+                for kind, p in parts]
+    payload = {"contents": [{"role": "user", "parts": contents}],
+               "generationConfig": {"temperature": float(rw["temperature"]), "topP": float(rw["top_p"]),
+                                    "maxOutputTokens": int(max_tokens or rw["max_length"])}}
+    if system:
+        payload["system_instruction"] = {"parts": [{"text": system}]}
+    out = http_json(f"{GEMINI_BASE}/models/{urllib.parse.quote(model)}:generateContent", payload,
+                    {"x-goog-api-key": gm["api_key"]})
+    try:
+        return "".join(p.get("text", "") for p in out["candidates"][0]["content"]["parts"] if not p.get("thought")).strip()
+    except (KeyError, IndexError):
+        raise RuntimeError("Gemini 沒有回傳內容：" + json.dumps(out, ensure_ascii=False)[:400])
+
+
+def openai_url(base):
+    base = (base or "").strip().rstrip("/")
+    if not base:
+        raise ValueError("還沒有填 OpenAI 相容端點網址")
+    return base if base.endswith("/chat/completions") else base + "/chat/completions"
+
+
+def rewrite_openai(oa, rw, system, parts, max_tokens=None):
+    content = [{"type": "text", "text": p} if kind == "text" else
+               {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + jpeg_b64(p)}} for kind, p in parts]
+    messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": content}]
+    payload = {"model": (oa.get("model") or "").strip() or "default", "messages": messages,
+               "temperature": float(rw["temperature"]), "top_p": float(rw["top_p"]),
+               "max_tokens": int(max_tokens or rw["max_length"])}
+    headers = {"Authorization": "Bearer " + oa["api_key"]} if oa.get("api_key") else {}
+    out = http_json(openai_url(oa.get("base_url")), payload, headers)
+    try:
+        text = out["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise RuntimeError("端點沒有回傳內容：" + json.dumps(out, ensure_ascii=False)[:400])
+    if isinstance(text, list):
+        text = "".join(c.get("text", "") for c in text)
+    return re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()
+
+
+def rewrite(cfg, req):
+    tagged, chosen, task, src = collect(cfg, req, req["prompt"])
+    duration = float(req["seconds"])
+    system, parts = rewrite_message(cfg, tagged, chosen, task, duration, req.get("skill"), src)
+    rw = cfg["rewriter"]
+    provider = rw.get("provider", "local")
+    t0 = time.time()
+    if provider == "gemini":
+        text = rewrite_gemini(rw["gemini"], rw, system, parts)
+    elif provider == "openai":
+        text = rewrite_openai(rw["openai"], rw, system, parts)
+    else:
+        text = rewrite_local(cfg, system, parts, uuid.uuid4().hex[:8])
+    text = re.sub(r"^```\w*\n|\n```$", "", text.strip())
     if task != "Ref2VA":
         text = normalize_base(text, task, duration)
     used = round(time.time() - t0, 1)
@@ -811,7 +980,40 @@ def rewrite(cfg, req):
         stats = load_json(STATS_PATH, DEFAULT_STATS)
         stats["rewrite"] = round(stats["rewrite"] * 0.6 + used * 0.4, 1)
         save_json(STATS_PATH, stats)
-    return {"prompt": text, "seconds_used": used, "task": task}
+    return {"prompt": text, "seconds_used": used, "task": task, "provider": provider}
+
+
+def test_rewriter(cfg, body):
+    """Settings' 驗證 button: a tiny POST to the chosen endpoint, plus its model list when it offers one.
+
+    An empty api_key in the form means "keep the stored key" (the browser never receives stored keys).
+    """
+    provider = body.get("provider")
+    if provider not in ("gemini", "openai"):
+        raise ValueError("本地小模型不需要驗證")
+    conf = dict(cfg["rewriter"].get(provider, {}))
+    conf.update({k: v for k, v in (body.get("conf") or {}).items() if v not in ("", None)})
+    rw = dict(cfg["rewriter"], temperature=0.2, top_p=0.9)
+    ping = [("text", "Reply with the single word OK.")]
+    t0 = time.time()
+    models = []
+    if provider == "gemini":
+        reply = rewrite_gemini(conf, rw, "", ping, max_tokens=512)
+        try:
+            listed = http_json(f"{GEMINI_BASE}/models?pageSize=200", headers={"x-goog-api-key": conf["api_key"]}, timeout=30)
+            models = [m["name"].split("/", 1)[-1] for m in listed.get("models", [])
+                      if "generateContent" in m.get("supportedGenerationMethods", []) and "gemini" in m["name"]]
+        except Exception:
+            pass
+    else:
+        reply = rewrite_openai(conf, rw, "", ping, max_tokens=512)
+        try:
+            base = openai_url(conf.get("base_url")).rsplit("/chat/completions", 1)[0]
+            headers = {"Authorization": "Bearer " + conf["api_key"]} if conf.get("api_key") else {}
+            models = [m["id"] for m in http_json(base + "/models", headers=headers, timeout=20).get("data", [])]
+        except Exception:
+            pass
+    return {"ok": True, "reply": reply[:80], "ms": int((time.time() - t0) * 1000), "models": models}
 
 
 # ---------------------------------------------------------------- video generation
@@ -918,6 +1120,8 @@ def build_generate(cfg, final_text, chosen, task, req, size, src_job=None):
         wf[N_COND] = {"class_type": "MiniMaxH3ImageToVideo", "inputs": node}
 
     wf[N_SECONDS]["inputs"]["value"] = float(req["seconds"])
+    total, low = cfg["steps"]["fast" if req.get("fast", True) else "normal"]
+    wf[N_SCHED]["inputs"]["steps"], wf[N_SAMPLER]["inputs"]["transition_step"] = int(total), int(low)
     seed = req.get("seed")
     wf[N_SAMPLER]["inputs"]["seed"] = int(seed) if seed not in (None, "", -1) else random.randint(0, 2**48)
 
@@ -976,15 +1180,14 @@ def generate(cfg, req):
                 tail=cfg["extend"]["tail_seconds"])
         src_job = {"tail_name": tail}
     wf, seed = build_generate(cfg, final_text, chosen, task, req, size, src_job)
-    template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
     prompt_id = queue_prompt(cfg, wf)
     job = {"id": prompt_id, "created": time.time(), "status": "queued", "mode": mode, "task": task,
            "prompt": req["prompt"], "final_prompt": final_text, "seed": seed, "aspect": req["aspect"],
            "resolution": req["resolution"], "width": size[0], "height": size[1], "seconds": req["seconds"],
            "intensity": req.get("intensity", "off"), "skill": req.get("skill") or "", "tray": req.get("tray", []),
            "first_id": req.get("first_id"), "last_id": req.get("last_id"),
-           "steps": template[N_SCHED]["inputs"].get("steps", 12),
-           "transition_step": template[N_SAMPLER]["inputs"].get("transition_step", 6)}
+           "fast": bool(req.get("fast", True)), "steps": wf[N_SCHED]["inputs"]["steps"],
+           "transition_step": wf[N_SAMPLER]["inputs"]["transition_step"]}
     if src:
         job["extend"] = {"source_id": src["id"], "source_name": src["name"], "tail": src_job["tail_name"],
                          "has_audio": src.get("has_audio", False)}
@@ -1126,6 +1329,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_file(safe_child(LIBRARY, url.path[len("/library/"):]))
             if url.path.startswith("/outputs/"):
                 return self.send_file(safe_child(OUTPUTS, url.path[len("/outputs/"):]))
+            if url.path == "/api/folders":
+                return self.send_json(load_json(FOLDERS_PATH, []))
             if url.path == "/api/library":
                 return self.send_json(library_index())
             if url.path == "/api/jobs":
@@ -1135,7 +1340,7 @@ class Handler(BaseHTTPRequestHandler):
                 loras = [{"id": k, "name": v["inputs"]["lora_name"], "strength": v["inputs"]["strength_model"]}
                          for k, v in wf.items() if v["class_type"] == "LoraLoaderModelOnly"]
                 stats = load_json(STATS_PATH, DEFAULT_STATS)
-                return self.send_json({"config": cfg, "skills": load_skills(cfg), "aspects": list(ASPECTS),
+                return self.send_json({"config": public_config(cfg), "skills": load_skills(cfg), "aspects": list(ASPECTS),
                                        "lora_nodes": loras, "rewrite_seconds": stats["rewrite"]})
             if url.path == "/api/models":
                 info = comfy(cfg, "/object_info/CLIPLoader")
@@ -1162,12 +1367,21 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/upload":
                 name = urllib.parse.unquote(self.headers.get("X-Filename", "upload"))
                 body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-                return self.send_json(add_asset(cfg, name, body))
+                folder = urllib.parse.unquote(self.headers.get("X-Folder", "")) or None
+                return self.send_json(add_asset(cfg, name, body, folder))
             if url.path == "/api/library/delete":
                 delete_asset(cfg, self.body_json()["id"])
                 return self.send_json({"ok": True})
             if url.path == "/api/library/from_job":
-                return self.send_json(add_output_to_library(cfg, self.body_json()["id"]))
+                b = self.body_json()
+                return self.send_json(add_output_to_library(cfg, b["id"], b.get("folder")))
+            if url.path == "/api/folders":
+                return self.send_json(folder_action(self.body_json()))
+            if url.path == "/api/library/move":
+                b = self.body_json()
+                return self.send_json(move_assets(b["ids"], b.get("folder")))
+            if url.path == "/api/rewriter/test":
+                return self.send_json(test_rewriter(cfg, self.body_json()))
             if url.path == "/api/rewrite":
                 return self.send_json(rewrite(cfg, self.body_json()))
             if url.path == "/api/generate":
@@ -1179,7 +1393,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"ok": True})
             if url.path == "/api/config":
                 new = self.body_json()
-                save_json(CONFIG_PATH, {k: new[k] for k in DEFAULT_CONFIG if k in new})
+                save_config(new)
                 return self.send_json({"ok": True})
             self.send_error(404)
         except subprocess.CalledProcessError as e:
@@ -1200,6 +1414,10 @@ def safe_child(base, rel):
 if __name__ == "__main__":
     LIBRARY.mkdir(exist_ok=True)
     OUTPUTS.mkdir(exist_ok=True)
+    # Windows lets a second process bind the same port when SO_REUSEADDR is set; an old server
+    # would then keep answering. Refuse instead, so a double start fails loudly.
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
+    httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     MONITOR.start()
     print(f"H3 Toybox running at http://127.0.0.1:{PORT}")
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    httpd.serve_forever()

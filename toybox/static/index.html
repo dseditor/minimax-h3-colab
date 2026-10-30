@@ -25,8 +25,12 @@
   <section class="panel library">
     <div class="panel-head">
       <h2><span class="dot pink"></span>素材庫</h2>
-      <label class="btn pill small yellow">＋ 上傳<input id="fileInput" type="file" multiple accept="image/*,video/*,audio/*" hidden></label>
+      <div class="head-btns">
+        <button id="btnNewFolder" class="pill small mint" title="建立資料夾，把素材拖進去整理">📁 新資料夾</button>
+        <label class="btn pill small yellow">＋ 上傳<input id="fileInput" type="file" multiple accept="image/*,video/*,audio/*" hidden></label>
+      </div>
     </div>
+    <div id="crumbs" class="crumbs"></div>
     <div class="tabs" id="libTabs">
       <button data-kind="all" class="active">全部</button>
       <button data-kind="image">圖片</button>
@@ -91,6 +95,10 @@
         <select id="skill"><option value="">不使用</option></select>
       </div>
       <div class="opt">
+        <label>速度</label>
+        <label class="switch"><input id="fastMode" type="checkbox" checked><span></span> ⚡ 快速模式 <small class="hint" id="fastHint">8 步</small></label>
+      </div>
+      <div class="opt">
         <label>Seed（空白＝隨機）</label>
         <input id="seed" type="number" placeholder="隨機">
       </div>
@@ -125,29 +133,57 @@
 <!-- 設定 -->
 <dialog id="settings">
   <form method="dialog" class="settings-form">
-    <h2>⚙ 設定</h2>
-    <fieldset>
-      <legend>提示詞改寫模型</legend>
-      <label>模型 <select id="cfgModel"></select></label>
-      <label class="switch"><input id="cfgThinking" type="checkbox"><span></span> 思考模式（較慢、較周全）</label>
-      <label>MTP 推測解碼
-        <select id="cfgMtp"><option>auto</option><option>off</option><option>2</option><option>3</option><option>4</option></select>
-      </label>
-      <div class="grid2">
-        <label>最大長度 <input id="cfgMaxLen" type="number" min="512" step="512"></label>
-        <label>溫度 <input id="cfgTemp" type="number" min="0.05" max="2" step="0.05"></label>
-        <label>top_p <input id="cfgTopP" type="number" min="0.05" max="1" step="0.05"></label>
-        <label>參考圖邊長 <input id="cfgSide" type="number" min="256" max="2048" step="64"></label>
-      </div>
-    </fieldset>
-    <fieldset>
-      <legend>LoRA 分組（關閉動作強度時只套用「文戲」）</legend>
-      <div id="cfgLoras"></div>
-    </fieldset>
-    <fieldset>
-      <legend>連線</legend>
-      <label>ComfyUI 網址 <input id="cfgUrl" type="text"></label>
-    </fieldset>
+    <div class="settings-head"><h2>⚙ 設定</h2><button value="cancel" class="pill small" title="關閉">✕</button></div>
+    <div class="settings-body">
+      <fieldset>
+        <legend>✨ 提示詞改寫</legend>
+        <div class="providers" id="cfgProvider">
+          <label class="prov"><input type="radio" name="provider" value="local"><span><b>🧸 本地小模型</b><small>H3 官方 9B 改寫模型，在 ComfyUI 裡跑，不用金鑰</small></span></label>
+          <label class="prov"><input type="radio" name="provider" value="gemini"><span><b>💎 Gemini</b><small>Google Gemini API，需要金鑰</small></span></label>
+          <label class="prov"><input type="radio" name="provider" value="openai"><span><b>🔌 OpenAI 相容端點</b><small>OpenAI、OpenRouter、LM Studio、vLLM…</small></span></label>
+        </div>
+
+        <div class="prov-panel" data-panel="local">
+          <label>模型 <select id="cfgModel"></select></label>
+          <div class="grid2">
+            <label>MTP 推測解碼
+              <select id="cfgMtp"><option>auto</option><option>off</option><option>2</option><option>3</option><option>4</option></select>
+            </label>
+            <label>最大長度 <input id="cfgMaxLen" type="number" min="512" step="512"></label>
+          </div>
+          <label class="switch"><input id="cfgThinking" type="checkbox"><span></span> 思考模式（較慢、較周全）</label>
+        </div>
+
+        <div class="prov-panel" data-panel="gemini">
+          <label>API 金鑰 <span class="key-row"><input id="cfgGemKey" type="password" autocomplete="off"><button type="button" class="pill small" data-clear-key="gemini">清除</button></span></label>
+          <label>模型（可從清單選，也可以自己輸入）<input id="cfgGemModel" type="text" list="gemModels"></label>
+          <datalist id="gemModels"></datalist>
+          <div class="verify"><button type="button" class="pill small blue" data-verify="gemini">🔍 驗證</button><span class="vres" id="gemResult"></span></div>
+        </div>
+
+        <div class="prov-panel" data-panel="openai">
+          <label>端點網址 <input id="cfgOaUrl" type="text" placeholder="例：https://api.openai.com/v1　或　http://127.0.0.1:1234/v1"></label>
+          <label>API 金鑰（本機伺服器可留空）<span class="key-row"><input id="cfgOaKey" type="password" autocomplete="off"><button type="button" class="pill small" data-clear-key="openai">清除</button></span></label>
+          <label>模型 <input id="cfgOaModel" type="text" list="oaModels" placeholder="例：gpt-5-mini"></label>
+          <datalist id="oaModels"></datalist>
+          <div class="verify"><button type="button" class="pill small blue" data-verify="openai">🔍 驗證</button><span class="vres" id="oaResult"></span></div>
+        </div>
+
+        <div class="grid3">
+          <label>溫度 <input id="cfgTemp" type="number" min="0.05" max="2" step="0.05"></label>
+          <label>top_p <input id="cfgTopP" type="number" min="0.05" max="1" step="0.05"></label>
+          <label>參考圖邊長 <input id="cfgSide" type="number" min="256" max="2048" step="64"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>🎛 LoRA 分組（關閉動作強度時只套用「文戲」）</legend>
+        <div id="cfgLoras"></div>
+      </fieldset>
+      <fieldset>
+        <legend>🔗 連線</legend>
+        <label>ComfyUI 網址 <input id="cfgUrl" type="text"></label>
+      </fieldset>
+    </div>
     <div class="dialog-actions">
       <button value="cancel" class="pill">取消</button>
       <button id="saveSettings" value="save" class="pill blue">儲存</button>
