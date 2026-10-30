@@ -7,6 +7,7 @@
 |---|---|---|
 | **H3_Basic_ComfyUI** | 基礎學習：裝好 ComfyUI＋H3 模型組，**不帶工作流**，自己拉節點 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dseditor/minimax-h3-colab/blob/main/H3_Basic_ComfyUI.ipynb) |
 | **H3_Digital_Human** | 數字人：一張人物照＋一段提示詞 → 會說話的影片；也可以交給桌面版 AI 用 skill 生成 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dseditor/minimax-h3-colab/blob/main/H3_Digital_Human.ipynb) |
+| **H3_Toybox** 🧸 | 可愛的網頁前端：參考生成／頭尾格／純文字／延伸影片＋提示詞改寫與剩餘時間；只開網頁，不用碰 ComfyUI 介面（約 50 GB 模型） | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dseditor/minimax-h3-colab/blob/main/H3_Toybox.ipynb) |
 
 > 一律從上面的按鈕開啟：筆記本改版只要更新這個 repo，按鈕永遠開到最新版，不必再傳新的分享網址。
 
@@ -91,6 +92,15 @@ ComfyUI 確認正常之後才下載，避免裝壞了還白抓 37 GB。
 
 安裝：把 `skills/h3-colab-digital-human` 整個資料夾放進 AI 的 skills 目錄。官方提示詞指南不隨本 repo 散布，skill 會引導 AI 從 MiniMax 官方 repo 下載（見 `references/H3_NOTICE.md`）。
 
+## H3 Toybox：網頁前端版
+
+`H3_Toybox.ipynb` 跑 ①②③ 三格就好：ComfyUI 只在背景當引擎，用 Colab 內建代理直接開 H3 Toybox 網頁（程式在 `toybox/`，說明在 [`toybox/README.md`](toybox/README.md)）。
+
+- 下載約 50 GB：上面四個基礎模型＋[dseditor/minimax-h3-studio-assets](https://huggingface.co/dseditor/minimax-h3-studio-assets) 的 LoRA、語意橋、潛空間放大器與 9B 提示詞改寫模型（各檔來源見該頁）。不勾 `INCLUDE_REWRITER` 可省 7 GB，網頁的改寫開關會自動關掉。
+- 節點組：T8 audio（語意橋）、SelfLift（兩段採樣）、H3 Motion Context（延伸影片）。
+- 官方提示詞指南不隨本 repo 散布，② 會從 MiniMax 官方 repo 下載到 `toybox/guides/`。
+- 本機版在 Windows 用 ComfyUI 內嵌 Python 直接跑 `toybox/server.py`；`config.json` 指定 ComfyUI 網址與 input 資料夾。
+
 ---
 
 ## 模型
@@ -115,7 +125,7 @@ ComfyUI 確認正常之後才下載，避免裝壞了還白抓 37 GB。
 
 ## 給維護者
 
-兩本筆記本由 `tools/build_notebooks.py` 產生，**不要直接改 ipynb**：
+三本筆記本由 `tools/build_notebooks.py` 產生，**不要直接改 ipynb**：
 
 ```bash
 python tools/build_notebooks.py

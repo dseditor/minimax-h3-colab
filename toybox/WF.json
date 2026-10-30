@@ -1,0 +1,518 @@
+{
+  "36": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "載入 VAE",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "37": {
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "載入 VAE",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "38": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "載入 CLIP",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "51": {
+    "inputs": {
+      "image": "ref_photo.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "載入圖片",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "53": {
+    "inputs": {
+      "lora_name": "minimax_h3_dmad_full_dareties_v4_step600_comfy_fro.safetensors",
+      "strength_model": 0.8000000000000002,
+      "model": [
+        "192",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "192": {
+    "inputs": {
+      "unet_name": "Minimax-h3_Singularity_x_10Eros-Max_PRISM_int8.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "載入擴散模型",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "250": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "259",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "數學運算式",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "252": {
+    "inputs": {
+      "aspect_ratio": "16:9 (Widescreen)",
+      "megapixels": 1.5,
+      "multiple": 32
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "分辨率选择器",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "253": {
+    "inputs": {
+      "samples": [
+        "397",
+        0
+      ],
+      "vae": [
+        "36",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE 解碼",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.0"
+    }
+  },
+  "254": {
+    "inputs": {
+      "samples": [
+        "397",
+        0
+      ],
+      "vae": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE 解碼音訊",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "255": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "K採樣器選擇",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "259": {
+    "inputs": {
+      "value": 15
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "视频时长（秒）",
+      "cnr_id": "comfy-core",
+      "ver": "0.30.1"
+    }
+  },
+  "261": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 12,
+      "denoise": 1,
+      "model": [
+        "329",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "265": {
+    "inputs": {
+      "prompt": "subject_definitions:\n<Subject 1> is the young woman in <Picture 1>, with long black hair, a black kimono with white floral patterns, a red sash, and holding a large silver scythe.\n<Picture 1> is the first frame of [Shot 1], showing the woman standing in a field of red spider lilies under a full moon.\n\nsummary:\n[keyframe completion + reference generation] The target video begins from <Picture 1> and depicts <Subject 1> fighting a demon in a field of red flowers under a bright moonlight. The scene features dynamic combat, swirling petals, and a triumphant ending.\n\nretention_analysis:\n<Subject 1> (appears in [Shot 1], [Shot 2], [Shot 3], [Shot 4], [Shot 5], [Shot 6], [Shot 7], [Shot 8], [Shot 9]): fully_preserved - the woman's appearance, clothing, and scythe are retained.\n<Picture 1> ([Shot 1] first frame): fully_preserved - the composition, lighting, and character position match the reference image.\n\ndetailed_description:\nThe target video uses a cinematic fantasy style with high-contrast lighting and vibrant red and blue tones.\n[Shot 1] The shot begins from <Picture 1>. <Subject 1> stands in a vast field of red spider lilies, holding a large silver scythe vertically. A bright full moon illuminates the night sky. The camera slowly pushes in toward her face.\n[Shot 2] At 00:01.500, the camera cuts to a medium shot. A shadowy demon lunges from the left. <Subject 1> swings the scythe horizontally, creating a silver arc that slices through the air. Red petals begin to swirl around them.\n[Shot 3] At 00:03.000, the camera tracks the scythe's movement in a close-up. The blade glows with a soft white light as it strikes the demon's arm. Petals burst outward from the impact point.\n[Shot 4] At 00:04.500, a low-angle shot shows <Subject 1> jumping into the air. She holds the scythe overhead, preparing for a downward strike. The camera tilts up to follow her ascent.\n[Shot 5] At 00:06.000, the camera follows the scythe as it descends. <Subject 1> swings down with force, the blade cutting through the demon's torso. The motion is fluid and graceful.\n[Shot 6] At 00:07.500, a side-view medium shot captures the continuous combat. <Subject 1> spins, using the scythe to create a circular barrier of light and petals to block another attack.\n[Shot 7] At 00:09.000, the camera zooms out slightly. <Subject 1> performs a final, wide swing. The scythe traces a large circle, sending a wave of red petals flying across the screen.\n[Shot 8] At 00:10.500, a close-up of <Subject 1>'s face. She smiles confidently, her eyes reflecting the moonlight. Her hair flows gently in the wind.\n[Shot 9] At 00:12.000, the camera pulls back to a wide shot. <Subject 1> stands tall in the center of the flower field, the scythe resting on her shoulder. The moon shines brightly behind her, marking her victory.\n\noverall_soundscape:\nSoft wind blowing through the flower field and the whooshing sound of the scythe slicing through the air.\n\nnon_diegetic_music:\nA dramatic orchestral score with strings and percussion, building in intensity during the combat and resolving into a calm, triumphant melody at the end.",
+      "width": [
+        "252",
+        0
+      ],
+      "height": [
+        "252",
+        1
+      ],
+      "length": [
+        "250",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "38",
+        0
+      ],
+      "vae": [
+        "36",
+        0
+      ],
+      "audio_vae": [
+        "37",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "51",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "MiniMax H3 參考轉影片",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "328": {
+    "inputs": {
+      "conditioning": [
+        "265",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "條件設定（歸零）",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "329": {
+    "inputs": {
+      "max_resolution": 1024,
+      "jpeg_quality": 80,
+      "suppress_default_preview": true,
+      "preview_frames": 1024,
+      "preview_fps": 12,
+      "tiny_vae": "taeh3.safetensors",
+      "model": [
+        "401",
+        0
+      ],
+      "vae": [
+        "36",
+        0
+      ]
+    },
+    "class_type": "ModelPreviewOverrideKJ",
+    "_meta": {
+      "title": "Model Preview Override",
+      "cnr_id": "comfyui-kjnodes",
+      "ver": "d7641533d6634eb05f8570c980fce8fc8528dc7b"
+    }
+  },
+  "331": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "343",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "模型注意力後端",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "332": {
+    "inputs": {
+      "selection": "sol-attn",
+      "selection.tau": 1.3,
+      "start_percent": 0.2,
+      "end_percent": 1,
+      "dense_blocks": "",
+      "min_tokens": 12288,
+      "extra_tokens": 256,
+      "sink_conditioning": "exact_kv_and_rows",
+      "verbose": true,
+      "model": [
+        "331",
+        0
+      ]
+    },
+    "class_type": "BlockSparseAttention",
+    "_meta": {
+      "title": "模型區塊稀疏注意力",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "333": {
+    "inputs": {
+      "shift_video": 12,
+      "shift_audio": 3.0000000000000004,
+      "model": [
+        "332",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "MiniMax H3 Sigma Shift",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "342": {
+    "inputs": {
+      "lora_name": "H3_Combat_V2.safetensors",
+      "strength_model": 0.6500000000000001,
+      "model": [
+        "404",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "343": {
+    "inputs": {
+      "lora_name": "H3_SPEED_slider.safetensors",
+      "strength_model": 2,
+      "model": [
+        "344",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "344": {
+    "inputs": {
+      "lora_name": "Motion_Repair.safetensors",
+      "strength_model": 0.3500000000000001,
+      "model": [
+        "342",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "364": {
+    "inputs": {
+      "frame_rate": 24,
+      "loop_count": 0,
+      "filename_prefix": "YZ_H3_",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "253",
+        0
+      ],
+      "audio": [
+        "254",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢",
+      "cnr_id": "comfyui-videohelpersuite",
+      "ver": "a7ce59e381934733bfae03b1be029756d6ce936d"
+    }
+  },
+  "397": {
+    "inputs": {
+      "seed": 245412848694760,
+      "cfg": 1,
+      "transition_step": 6,
+      "lowres_scale": 0.6000000000000001,
+      "rho": 0,
+      "w_min": 0.5,
+      "w_max": 1,
+      "upscaler_model": "minimax_h3_latent_upscaler_3d_fp16_V2.safetensors",
+      "highres_tiling": false,
+      "upscaler_unload": true,
+      "model": [
+        "329",
+        0
+      ],
+      "positive": [
+        "402",
+        0
+      ],
+      "negative": [
+        "328",
+        0
+      ],
+      "vae": [
+        "36",
+        0
+      ],
+      "latent_image": [
+        "265",
+        1
+      ],
+      "sampler": [
+        "255",
+        0
+      ],
+      "sigmas": [
+        "261",
+        0
+      ]
+    },
+    "class_type": "SelfLiftH3Sampler",
+    "_meta": {
+      "title": "SelfLift Progressive Sampler (MiniMax H3)",
+      "aux_id": "facok/comfyui-SelfLift",
+      "ver": "835c3cf7919410f71f414688f049c6ca497789d0"
+    }
+  },
+  "400": {
+    "inputs": {
+      "lora_name": "MysticXXX_MMH3-V2.safetensors",
+      "strength_model": 0.3500000000000001,
+      "model": [
+        "53",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  },
+  "401": {
+    "inputs": {
+      "chunks": 2,
+      "seq_threshold": 4096,
+      "model": [
+        "333",
+        0
+      ]
+    },
+    "class_type": "MiniMaxChunkFeedForward",
+    "_meta": {
+      "title": "MiniMax H3 Chunk FeedForward",
+      "cnr_id": "comfyui-kjnodes",
+      "ver": "d7641533d6634eb05f8570c980fce8fc8528dc7b"
+    }
+  },
+  "402": {
+    "inputs": {
+      "conditioning": [
+        "265",
+        0
+      ],
+      "semantic_bridge": [
+        "403",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SemanticBridgeApplyT8",
+    "_meta": {
+      "title": "H3 Semantic Bridge / 应用条件 (T8 EXP)",
+      "cnr_id": "minimax-h3-audio-t8",
+      "ver": "2ccd8eb0a4160eef12f00e30b5aefda42d8be577"
+    }
+  },
+  "403": {
+    "inputs": {
+      "model_name": "t8_compat/BUNNY_H3_ActionLogic_Bridge_V1_T8_Compat.safetensors",
+      "enabled": true,
+      "alpha": 0.1,
+      "magnitude_match": "per_token",
+      "token_scope": "all_tokens",
+      "device": "auto",
+      "chunk_tokens": 256
+    },
+    "class_type": "MiniMaxH3SemanticBridgeConfigT8",
+    "_meta": {
+      "title": "H3 Semantic Bridge / 模型与设置 (T8 EXP)",
+      "cnr_id": "minimax-h3-audio-t8",
+      "ver": "2ccd8eb0a4160eef12f00e30b5aefda42d8be577"
+    }
+  },
+  "404": {
+    "inputs": {
+      "lora_name": "minimax_h3_turbo_v4_step600_ema_DasiwaREF2VAHybridV1_0_curveproj1025_compat_v001.safetensors",
+      "strength_model": 1,
+      "model": [
+        "400",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly",
+      "cnr_id": "comfy-core",
+      "ver": "0.40.0"
+    }
+  }
+}

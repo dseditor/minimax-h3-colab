@@ -1,0 +1,8 @@
+library/
+outputs/
+guides/
+jobs.json
+stats.json
+config.json
+__pycache__/
+*.tmp

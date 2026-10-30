@@ -307,9 +307,211 @@ from google.colab import files
 files.download('/content/H3_digital_human.json')
 """)
 
+# ---------------------------------------------------------------- H3 Toybox（網頁前端）
+# ComfyUI 只當背景引擎、不開它的介面；瀏覽器只開 toybox/ 這個前端（Colab 內建代理）。
+TOYBOX = [
+    md("""# H3 Toybox｜Colab 版（可愛的 MiniMax H3 網頁前端）
+
+把想像丟進玩具箱，搖一搖就變成影片 🧸 ComfyUI 只在背景當引擎，**不用開 ComfyUI 介面**，所有操作都在 H3 Toybox 網頁裡。
+
+由上往下依序執行。**執行階段請選 L4 GPU**（A100 也可以但很耗點數；T4 跑不動）。
+
+| 步驟 | 做什麼 |
+|---|---|
+| ① 檢查＋安裝 | GPU／驅動不符就停下；通過才裝 ComfyUI、3 個節點組、H3 Toybox |
+| ② 下載模型 | 約 50 GB（含 7 GB 的提示詞改寫模型，可以不勾） |
+| ③ 啟動＋開網頁 | 背景啟動 ComfyUI 與 H3 Toybox，用 Colab 內建代理開網頁 |
+| ③-b | 瀏覽器的 Google 帳號和 Colab 不同時，改用 cloudflare 網址 |
+
+**網頁裡能做的事**
+- 🧸 **參考生成**：圖片 9 張／影片 3 支／聲音 3 段當參考，提示詞裡用 `@圖片1` 標記
+- 🎞 **頭尾格**：只放首格、只放尾格、或兩張都放
+- ✏️ **純文字**：只靠一段描述
+- 🧵 **延伸影片**：參考影片勾「延伸這支影片」，新片段會從它的最後一格接下去，並自動接回原片
+- ✨ **提示詞改寫**：用 H3 官方的 9B 改寫模型把中文描述擴寫成 H3 規格的英文提示詞（改寫結果預設收起來）
+- 每支影片都會顯示目前做到哪一步、還要多久
+
+**Hugging Face 權杖（建議）**：左側欄「🔑 密鑰」新增 `HF_TOKEN`（請用**唯讀**權杖），並開啟「筆記本存取權」。
+
+模型：`Minimax-h3_Singularity_x_10Eros-Max_PRISM`（int8）＋官方 Qwen3-VL 文字編碼器與 VAE；LoRA、語意橋、潛空間放大器與改寫模型鏡像在 [dseditor/minimax-h3-studio-assets](https://huggingface.co/dseditor/minimax-h3-studio-assets)（各檔來源見該頁）。授權依照各來源模型。
+
+最新版：<https://github.com/dseditor/minimax-h3-colab>"""),
+    code("""#@title ① 檢查環境＋安裝 ComfyUI、節點與 H3 Toybox（GPU 或驅動不符就停下，不會安裝）
+import torch, shutil, subprocess, sys, os
+from pathlib import Path
+if not torch.cuda.is_available():
+    raise RuntimeError('沒有 GPU：請到「執行階段 → 變更執行階段類型」選 L4 GPU，再重跑這格')
+cap = torch.cuda.get_device_capability(0)
+drv = subprocess.run(['nvidia-smi', '--query-gpu=driver_version', '--format=csv,noheader'], capture_output=True, text=True).stdout.strip()
+print('GPU:', torch.cuda.get_device_name(0), '| capability', cap, '| VRAM', round(torch.cuda.get_device_properties(0).total_memory / 2**30, 1), 'GiB')
+print('驅動:', drv, '| 可用磁碟', round(shutil.disk_usage('/content').free / 2**30, 1), 'GiB')
+if cap < (8, 0):
+    raise RuntimeError(f'這張卡（capability {cap}）跑不動 int8 模型，沒有安裝任何東西。請換 L4（或 A100）再重跑。')
+if int(drv.split('.')[0]) < 580:
+    raise RuntimeError(f'驅動 {drv} 不支援 CUDA 13（需要 580 以上），沒有安裝任何東西。請換一台執行階段（L4）再試。')
+if shutil.disk_usage('/content').free < 60 * 2**30:
+    raise RuntimeError('磁碟剩不到 60 GiB，放不下約 50 GB 的模型。請換一台執行階段。')
+print('✅ 環境檢查通過，開始安裝')
+try:
+    from google.colab import userdata
+    os.environ['HF_TOKEN'] = userdata.get('HF_TOKEN'); print('已讀到 HF_TOKEN')
+except Exception:
+    print('沒有設定 HF_TOKEN，之後改用匿名下載（人多時可能被限速）')
+
+def clone(url, dest):
+    if not Path(dest).exists():
+        subprocess.run(['git', 'clone', '--depth', '1', url, str(dest)], check=True)
+    else:
+        subprocess.run(['git', '-C', str(dest), 'pull', '--ff-only'], check=False)
+
+COMFY = Path('/content/ComfyUI')
+clone('https://github.com/Comfy-Org/ComfyUI.git', COMFY)
+if not (torch.version.cuda or '').startswith('13'):
+    print('安裝 CUDA 13 版 PyTorch（int8 ConvRot 權重需要）…')
+    subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'torch', 'torchvision', 'torchaudio',
+                    '--index-url', 'https://download.pytorch.org/whl/cu130'], check=True)
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', '-r', str(COMFY / 'requirements.txt'), 'huggingface_hub', 'hf_xet'], check=True)
+# 工作流用到的三個節點組（都不會動到 PyTorch）
+NODES = {
+    'minimax-h3-audio-t8': 'https://github.com/T8mars/comfyui-minimax-h3-audio-T8',        # 語意橋 Semantic Bridge
+    'comfyui-SelfLift': 'https://github.com/facok/comfyui-SelfLift',                      # 低解析度→潛空間放大→高解析度
+    'ComfyUI-H3-Motion-Context': 'https://github.com/NikoDemon80/ComfyUI-H3-Motion-Context',  # 延伸影片（氣鎖）
+}
+for name, url in NODES.items():
+    clone(url, COMFY / 'custom_nodes' / name)
+# 導演 Skill 只是文字檔：放在 custom_nodes 外面，不載入它的節點
+clone('https://github.com/T8mars/comfyui-minimax-h3-prompt-enhancer-T8', '/content/t8-enhancer')
+# H3 Toybox 本體
+clone('https://github.com/dseditor/minimax-h3-colab.git', '/content/minimax-h3-colab')
+APP = Path('/content/minimax-h3-colab/toybox')
+print('ffmpeg:', shutil.which('ffmpeg') or '沒有（延伸影片會失敗）')
+out = subprocess.run([sys.executable, '-c', 'import torch;print(torch.__version__, torch.version.cuda, torch.cuda.is_available())'],
+                     capture_output=True, text=True)
+print('ComfyUI 會用的 PyTorch：', out.stdout.strip(), out.stderr[-300:])
+print('✅ 安裝完成')
+"""),
+    code("""#@title ② 下載模型（約 50 GB）
+# 預設直接從 Hugging Face 下載（最快）。HF 權杖已在 ① 讀入。
+# 只有在 Hugging Face 撞到流量上限時，才勾選 USE_DRIVE_CACHE：
+#   勾選後會從「我的雲端硬碟/H3_models」複製（比 HF 慢），雲端硬碟沒有的檔案才去 HF 抓並順便存一份。
+USE_DRIVE_CACHE = False  #@param {type:"boolean"}
+#@markdown 不勾就少下載 7 GB，網頁裡的「提示詞改寫」會自動關掉，直接用你寫的描述生成。
+INCLUDE_REWRITER = True  #@param {type:"boolean"}
+from huggingface_hub import hf_hub_download
+import shutil, time
+CACHE = None
+if USE_DRIVE_CACHE:
+    from google.colab import drive
+    drive.mount('/content/drive')
+    CACHE = Path('/content/drive/MyDrive/H3_models'); CACHE.mkdir(parents=True, exist_ok=True)
+ASSETS = 'dseditor/minimax-h3-studio-assets'
+files = [  # (repo, 檔案, 放到 models/ 底下的哪裡)
+    ('OliviaRossi/Minimax-h3_Singularity-x-10Eros-Max_PRISM', 'Minimax-h3_Singularity_x_10Eros-Max_PRISM_int8.safetensors', 'diffusion_models'),
+    ('Comfy-Org/MiniMax-H3', 'text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors', 'text_encoders'),
+    ('Comfy-Org/MiniMax-H3', 'vae/minimax_h3_video_vae_int8_convrot.safetensors', 'vae'),
+    ('Comfy-Org/MiniMax-H3', 'vae/minimax_h3_audio_vae_fp32.safetensors', 'vae'),
+] + [(ASSETS, f, str(Path(f).parent)) for f in [
+    'loras/minimax_h3_dmad_full_dareties_v4_step600_comfy_fro.safetensors',
+    'loras/minimax_h3_turbo_v4_step600_ema_DasiwaREF2VAHybridV1_0_curveproj1025_compat_v001.safetensors',
+    'loras/MysticXXX_MMH3-V2.safetensors',
+    'loras/H3_Combat_V2.safetensors',
+    'loras/Motion_Repair.safetensors',
+    'loras/H3_SPEED_slider.safetensors',
+    'semantic_bridge/t8_compat/BUNNY_H3_ActionLogic_Bridge_V1_T8_Compat.safetensors',
+    'latent_upscale_models/minimax_h3_latent_upscaler_3d_fp16_V2.safetensors',
+] + (['text_encoders/minimax_h3_rewriter_ref2va_qwen3.5_9b_w4a8.safetensors'] if INCLUDE_REWRITER else [])]
+t0 = time.time()
+for repo, name, folder in files:
+    target = COMFY / 'models' / folder / Path(name).name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    cached = CACHE / Path(name).name if CACHE else None
+    if not target.is_file():
+        if cached and cached.is_file():
+            print('從雲端硬碟複製', cached.name); shutil.copy(str(cached), str(target))
+        else:
+            got = Path(hf_hub_download(repo_id=repo, filename=name, local_dir='/content/hf'))
+            shutil.move(str(got), str(target))
+    if cached and not cached.is_file():
+        print('存一份到雲端硬碟', cached.name); shutil.copy(str(target), str(cached))
+    print(f'{folder:<28} {target.name[:60]:<60} {target.stat().st_size / 2**30:5.1f} GiB')
+# 官方提示詞寫作指南（改寫模型照它寫）
+GUIDES = APP / 'guides'; GUIDES.mkdir(exist_ok=True)
+for g in ('VIDEO_PROMPT_WRITING_GUIDE_ref_en.md', 'VIDEO_PROMPT_WRITING_GUIDE_base_en.md'):
+    got = Path(hf_hub_download(repo_id='MiniMaxAI/MiniMax-H3', filename='docs/' + g, local_dir='/content/hf'))
+    shutil.copy(str(got), str(GUIDES / g))
+print(f'✅ 下載完成，{(time.time() - t0) / 60:.1f} 分鐘')
+"""),
+    code("""#@title ③ 啟動 ComfyUI（背景）＋ H3 Toybox，開網頁
+# 執行後下面會出現一個連結；顯示成 localhost 也沒關係，直接點它就會開新分頁。
+# ⚠️ 開分頁的瀏覽器必須登入「跟這本 Colab 同一個 Google 帳號」；帳號不同就改用下一格 ③-b。
+import subprocess, time, urllib.request, json, sys, os
+def wait_http(url, name, log, tries=180):
+    for i in range(tries):
+        try:
+            urllib.request.urlopen(url, timeout=2); print(name, '已啟動'); return
+        except Exception:
+            time.sleep(2)
+    print(open(log, encoding='utf-8', errors='ignore').read()[-3000:])
+    raise RuntimeError(name + ' 沒有啟動成功，看上面的紀錄')
+
+for proc in ('server', 'toybox'):
+    if proc in globals() and globals()[proc].poll() is None:
+        globals()[proc].terminate(); globals()[proc].wait()
+# ComfyUI 只當引擎：只聽 127.0.0.1，不對外開介面
+server = subprocess.Popen([sys.executable, 'main.py', '--listen', '127.0.0.1', '--port', '8188'],
+                          cwd=str(COMFY), stdout=open('/content/comfyui.log', 'w'), stderr=subprocess.STDOUT)
+wait_http('http://127.0.0.1:8188/system_stats', 'ComfyUI', '/content/comfyui.log')
+# H3 Toybox 的 Colab 設定
+(COMFY / 'input').mkdir(exist_ok=True)
+(APP / 'config.json').write_text(json.dumps({
+    'comfy_url': 'http://127.0.0.1:8188',
+    'comfy_input_dir': str(COMFY / 'input'),
+    'skills_dir': '/content/t8-enhancer/directional_skills',
+    'free_after_rewrite': True,   # Colab 記憶體比較小：改寫完就把 9B 模型卸載
+}, ensure_ascii=False, indent=1), encoding='utf-8')
+toybox = subprocess.Popen([sys.executable, 'server.py'], cwd=str(APP), env=dict(os.environ, H3TOYBOX_PORT='8190'),
+                          stdout=open('/content/toybox.log', 'w'), stderr=subprocess.STDOUT)
+wait_http('http://127.0.0.1:8190/api/config', 'H3 Toybox', '/content/toybox.log', tries=30)
+from google.colab import output
+output.serve_kernel_port_as_window(8190, anchor_text='🧸 打開 H3 Toybox')
+"""),
+    code("""#@title ③-b（備援）用 cloudflare 網址開 H3 Toybox：瀏覽器登入的 Google 帳號和 Colab 不同時用這格
+# ⚠️ 網址沒有密碼，拿到的人都能用你的 GPU —— 不要貼到公開的地方。
+import subprocess, re, time
+if not Path('/content/cloudflared').exists():
+    subprocess.run(['wget', '-q', '-O', '/content/cloudflared',
+                    'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64'], check=True)
+    subprocess.run(['chmod', '+x', '/content/cloudflared'], check=True)
+# 通道的輸出寫進檔案，不要接 PIPE：PIPE 沒人讀會塞滿，通道就卡住
+if 'tun' in globals() and tun.poll() is None:
+    tun.terminate(); tun.wait()
+open('/content/cloudflared.log', 'w').close()
+tun = subprocess.Popen(['/content/cloudflared', 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:8190'],
+                       stdout=open('/content/cloudflared.log', 'a'), stderr=subprocess.STDOUT)
+url = None
+for i in range(60):
+    time.sleep(1)
+    m = re.search(r'https://[a-z0-9-]+\\.trycloudflare\\.com', open('/content/cloudflared.log').read())
+    if m:
+        url = m.group(0); break
+print('👉 H3 Toybox：', url or '（沒拿到網址，看 /content/cloudflared.log）')
+"""),
+    code("""#@title 🔍 出問題時跑這格：看 GPU、ComfyUI 與 H3 Toybox 的紀錄
+import subprocess
+print(subprocess.run(['nvidia-smi'], capture_output=True, text=True).stdout)
+print(subprocess.run(['free', '-g'], capture_output=True, text=True).stdout)
+log = open('/content/comfyui.log', encoding='utf-8', errors='ignore').read()
+keys = ('error', 'Error', 'Traceback', 'out of memory', 'SelfLift timing] high_resolution total', 'Prompt executed', 'IMPORT FAILED')
+print('\\n'.join(l for l in log.splitlines() if any(k in l for k in keys))[-4000:])
+print('---- H3 Toybox ----')
+print(open('/content/toybox.log', encoding='utf-8', errors='ignore').read()[-2000:])
+"""),
+]
+
 NOTEBOOKS = {
     'H3_Digital_Human.ipynb': cells,
     'H3_Basic_ComfyUI.ipynb': [HEAD_BASIC, cells[1], C2_BASIC, C3_BASIC, cells[4], cells[5], cells[9]],
+    'H3_Toybox.ipynb': TOYBOX,
 }
 for fname, cs in NOTEBOOKS.items():
     nb = {'cells': cs,

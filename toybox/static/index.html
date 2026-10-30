@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H3 Toybox</title>
+<link rel="icon" href="/static/img/mascot.png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img class="brand-mascot" src="/static/img/mascot.png" alt="">
+    <h1 class="rainbow"><span>H</span><span>3</span> <span>T</span><span>o</span><span>y</span><span>b</span><span>o</span><span>x</span></h1>
+    <small>把想像丟進玩具箱，搖一搖就變成影片</small>
+  </div>
+  <div class="topbar-right">
+    <span id="comfyStatus" class="pill status">連線中…</span>
+    <button id="openSettings" class="pill">⚙ 設定</button>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- 素材庫 -->
+  <section class="panel library">
+    <div class="panel-head">
+      <h2><span class="dot pink"></span>素材庫</h2>
+      <label class="btn pill small yellow">＋ 上傳<input id="fileInput" type="file" multiple accept="image/*,video/*,audio/*" hidden></label>
+    </div>
+    <div class="tabs" id="libTabs">
+      <button data-kind="all" class="active">全部</button>
+      <button data-kind="image">圖片</button>
+      <button data-kind="video">影片</button>
+      <button data-kind="audio">音訊</button>
+    </div>
+    <div id="dropZone" class="dropzone">把圖片、影片、音訊拖進來 🧸</div>
+    <div id="libGrid" class="lib-grid"></div>
+  </section>
+
+  <!-- 創作區 -->
+  <section class="panel compose">
+    <div class="modes" id="modeTabs">
+      <button data-mode="ref" class="mode pink active"><b>🧸 參考生成</b><small>圖片・影片・聲音當參考</small></button>
+      <button data-mode="frames" class="mode blue"><b>🎞 頭尾格</b><small>指定第一格、最後一格</small></button>
+      <button data-mode="text" class="mode yellow"><b>✏️ 純文字</b><small>只靠一段描述</small></button>
+    </div>
+
+    <div id="refArea">
+      <div class="area-head"><span>參考素材</span><span class="hint">在素材庫按「＋參考」加入，再用 <b>@</b> 標記；影片可以切成「延伸」</span></div>
+      <div id="tray" class="tray"></div>
+    </div>
+
+    <div id="framesArea" hidden>
+      <div class="area-head"><span>頭尾格</span><span class="hint">只放首格＝往後發展；只放尾格＝倒推到這一格；兩張都放＝從頭走到尾</span></div>
+      <div class="frame-slots">
+        <div class="slot" data-slot="first"><div class="slot-label">🎬 首格</div><div class="slot-body"></div></div>
+        <div class="slot-arrow">➜</div>
+        <div class="slot" data-slot="last"><div class="slot-label">🏁 尾格</div><div class="slot-body"></div></div>
+      </div>
+    </div>
+
+    <div class="editor-wrap">
+      <div id="editorBackdrop" class="editor-backdrop" aria-hidden="true"></div>
+      <textarea id="prompt" class="editor" spellcheck="false"></textarea>
+      <div id="mentionMenu" class="mention-menu" hidden></div>
+    </div>
+
+    <div class="options">
+      <div class="opt">
+        <label>畫面比例</label>
+        <div class="seg" id="aspectSeg"></div>
+      </div>
+      <div class="opt">
+        <label>解析度</label>
+        <div class="seg" id="resSeg">
+          <button data-v="480P">480P</button><button data-v="720P" class="active">720P</button><button data-v="1080P">1080P</button>
+        </div>
+      </div>
+      <div class="opt">
+        <label>秒數 <b id="secondsVal">10</b> 秒 <span id="extendNote" class="hint" hidden>（前 0.9 秒是接縫，會被剪掉）</span></label>
+        <input id="seconds" type="range" min="3" max="15" step="1" value="10">
+      </div>
+      <div class="opt">
+        <label>動作強度 <span class="tip" title="關：只套用文戲 LoRA；開啟：套用全部 LoRA，動作 LoRA 強度依等級縮放">?</span></label>
+        <div class="seg" id="intensitySeg">
+          <button data-v="off" class="active">關（文戲）</button><button data-v="low">低</button><button data-v="mid">中</button><button data-v="high">高</button>
+        </div>
+      </div>
+      <div class="opt">
+        <label>導演 Skill</label>
+        <select id="skill"><option value="">不使用</option></select>
+      </div>
+      <div class="opt">
+        <label>Seed（空白＝隨機）</label>
+        <input id="seed" type="number" placeholder="隨機">
+      </div>
+    </div>
+
+    <div class="rewrite-row">
+      <label class="switch"><input id="useRewrite" type="checkbox" checked><span></span> ✨ 提示詞改寫</label>
+      <div class="actions">
+        <button id="btnRewrite" class="pill">改寫預覽</button>
+        <button id="btnGenerate" class="pill big blue">🎬 生成影片</button>
+      </div>
+    </div>
+    <div id="rewriteProgress" class="mini-progress" hidden><div class="bar"><i></i></div><span></span></div>
+
+    <details id="rewriteBox" class="rewrite-box" hidden>
+      <summary>
+        <span>✨ 改寫後的提示詞 <small id="rewriteMeta"></small></span>
+        <span id="rewriteStale" class="badge warn" hidden>內容改過了，生成時會重新改寫</span>
+        <span class="open-hint">點開查看・修改</span>
+      </summary>
+      <textarea id="rewriteText" spellcheck="false"></textarea>
+    </details>
+  </section>
+
+  <!-- 結果 -->
+  <section class="panel results">
+    <div class="panel-head"><h2><span class="dot blue"></span>生成結果</h2></div>
+    <div id="jobList" class="job-list"></div>
+  </section>
+</main>
+
+<!-- 設定 -->
+<dialog id="settings">
+  <form method="dialog" class="settings-form">
+    <h2>⚙ 設定</h2>
+    <fieldset>
+      <legend>提示詞改寫模型</legend>
+      <label>模型 <select id="cfgModel"></select></label>
+      <label class="switch"><input id="cfgThinking" type="checkbox"><span></span> 思考模式（較慢、較周全）</label>
+      <label>MTP 推測解碼
+        <select id="cfgMtp"><option>auto</option><option>off</option><option>2</option><option>3</option><option>4</option></select>
+      </label>
+      <div class="grid2">
+        <label>最大長度 <input id="cfgMaxLen" type="number" min="512" step="512"></label>
+        <label>溫度 <input id="cfgTemp" type="number" min="0.05" max="2" step="0.05"></label>
+        <label>top_p <input id="cfgTopP" type="number" min="0.05" max="1" step="0.05"></label>
+        <label>參考圖邊長 <input id="cfgSide" type="number" min="256" max="2048" step="64"></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>LoRA 分組（關閉動作強度時只套用「文戲」）</legend>
+      <div id="cfgLoras"></div>
+    </fieldset>
+    <fieldset>
+      <legend>連線</legend>
+      <label>ComfyUI 網址 <input id="cfgUrl" type="text"></label>
+    </fieldset>
+    <div class="dialog-actions">
+      <button value="cancel" class="pill">取消</button>
+      <button id="saveSettings" value="save" class="pill blue">儲存</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
