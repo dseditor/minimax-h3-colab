@@ -890,7 +890,8 @@ def rewrite_local(cfg, system, parts, job_id):
     return "".join(entry["outputs"].get("3", {}).get("text", [])).strip()
 
 
-def http_json(url, payload=None, headers=None, timeout=300):
+def http_json(url, payload=None, headers=None, timeout=600, retries=2):
+    """JSON request; transient server errors (500/502/503, common on free Gemini/Gemma tiers) are retried."""
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST" if data else "GET",
                                  headers={"Content-Type": "application/json", **(headers or {})})
@@ -898,6 +899,9 @@ def http_json(url, payload=None, headers=None, timeout=300):
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
+        if e.code in (500, 502, 503) and retries > 0:
+            time.sleep(3)
+            return http_json(url, payload, headers, timeout, retries - 1)
         detail = e.read().decode("utf-8", "replace")
         try:
             parsed = json.loads(detail)

@@ -549,7 +549,7 @@ function syncSegs() {
     for (const b of $(id).children) b.classList.toggle("active", b.dataset.v === state[key]);
 }
 
-const GEMINI_DEFAULTS = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
+const GEMINI_DEFAULTS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemma-4-26b-a4b-it"];
 
 function setDatalist(id, names) {
   $(id).innerHTML = [...new Set(names)].map(n => `<option value="${esc(n)}">`).join("");
