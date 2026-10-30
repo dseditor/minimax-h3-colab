@@ -59,6 +59,15 @@ SelfLift 兩段採樣從 12 步（低 6＋高 6）降到 8 步（低 4＋高 4�
 
 素材可以拖進資料夾整理；拖到「🧸 全部素材」就移出來。資料夾只有一層，存在 `library/folders.json`，素材的 `folder` 欄位指向它。刪資料夾不會刪素材，素材會回到最外層。在資料夾裡上傳，或從生成結果「加入素材庫」，都會直接放進目前的資料夾。
 
+## 💾 資料放在哪裡
+
+使用者做出來的東西都放在 `H3TOYBOX_DATA`（沒設就是程式資料夾本身）：`library/`（含 `folders.json`）、`outputs/`、`jobs.json`、`stats.json`、`config.json`。
+API 金鑰另外存在 `H3TOYBOX_SECRETS`（預設 `DATA/secrets.json`），不寫進 `config.json`。
+啟動時 `restore_inputs()` 會把素材庫裡、但 ComfyUI input 資料夾缺的檔案補回去（新的執行階段 input 是空的）。
+
+Colab 版 ③ 預設 `SAVE_TO_DRIVE`：DATA＝「我的雲端硬碟/H3Toybox」，ComfyUI 的 `output/H3Toybox` 也連結到那裡的 `videos/`；
+`SAVE_API_KEYS` 預設不勾，金鑰只放在執行階段的暫存空間。
+
 ## 已知
 
 - 延伸接點後約第 2 格有一格幾乎重複（幀差 1.5，正常約 19），播放時可能有 1/24 秒的頓點，尚未查明是哪一側。

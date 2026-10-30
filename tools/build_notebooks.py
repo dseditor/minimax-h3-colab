@@ -320,7 +320,7 @@ TOYBOX = [
 |---|---|
 | ① 檢查＋安裝 | GPU／驅動不符就停下；通過才裝 ComfyUI、3 個節點組、H3 Toybox |
 | ② 下載模型 | 約 50 GB（含 7 GB 的提示詞改寫模型，可以不勾） |
-| ③ 啟動＋開網頁 | 背景啟動 ComfyUI 與 H3 Toybox，用 Colab 內建代理開網頁 |
+| ③ 啟動＋開網頁 | 背景啟動 ComfyUI 與 H3 Toybox，用 Colab 內建代理開網頁；作品預設存到雲端硬碟「H3Toybox」資料夾 |
 | ③-b | 瀏覽器的 Google 帳號和 Colab 不同時，改用 cloudflare 網址 |
 
 **網頁裡能做的事**
@@ -446,7 +446,12 @@ print(f'✅ 下載完成，{(time.time() - t0) / 60:.1f} 分鐘')
     code("""#@title ③ 啟動 ComfyUI（背景）＋ H3 Toybox，開網頁
 # 執行後下面會出現一個連結；顯示成 localhost 也沒關係，直接點它就會開新分頁。
 # ⚠️ 開分頁的瀏覽器必須登入「跟這本 Colab 同一個 Google 帳號」；帳號不同就改用下一格 ③-b。
-import subprocess, time, urllib.request, json, sys, os
+#@markdown **作品存到雲端硬碟**：素材庫、資料夾、生成的影片、生成紀錄都放在「我的雲端硬碟/H3Toybox」，
+#@markdown 斷線或不小心關掉執行階段，重開後再跑一次 ①②③ 東西都還在。第一次會跳出授權視窗，按同意即可。
+SAVE_TO_DRIVE = True  #@param {type:"boolean"}
+#@markdown API 金鑰也存到雲端硬碟（下次不用重貼；但雲端硬碟裡會有一份金鑰檔）
+SAVE_API_KEYS = False  #@param {type:"boolean"}
+import subprocess, time, urllib.request, json, sys, os, shutil
 def wait_http(url, name, log, tries=180):
     for i in range(tries):
         try:
@@ -463,17 +468,44 @@ for proc in ('server', 'toybox'):
 server = subprocess.Popen([sys.executable, 'main.py', '--listen', '127.0.0.1', '--port', '8188'],
                           cwd=str(COMFY), stdout=open('/content/comfyui.log', 'w'), stderr=subprocess.STDOUT)
 wait_http('http://127.0.0.1:8188/system_stats', 'ComfyUI', '/content/comfyui.log')
-# H3 Toybox 的 Colab 設定
+# 作品放哪裡：雲端硬碟（授權成功）或這台執行階段的暫存空間
+DATA = Path('/content/h3toybox_data')
+if SAVE_TO_DRIVE:
+    try:
+        from google.colab import drive
+        drive.mount('/content/drive')
+        DATA = Path('/content/drive/MyDrive/H3Toybox')
+    except Exception as e:
+        print('⚠️ 沒有掛上雲端硬碟（', e, '）：這次的作品只存在暫存空間，關掉執行階段就會消失')
+DATA.mkdir(parents=True, exist_ok=True)
+# ComfyUI 生成的影片直接寫進 DATA/videos（用連結，不用另外同步）
+videos, out_dir = DATA / 'videos', COMFY / 'output' / 'H3Toybox'
+videos.mkdir(exist_ok=True)
+out_dir.parent.mkdir(parents=True, exist_ok=True)
+if out_dir.is_dir() and not out_dir.is_symlink():
+    for f in out_dir.iterdir():
+        shutil.move(str(f), str(videos / f.name))
+    out_dir.rmdir()
+if not out_dir.exists():
+    out_dir.symlink_to(videos, target_is_directory=True)
+# H3 Toybox 的 Colab 設定（保留使用者在網頁設定頁改過的內容，只覆寫這台機器的路徑）
 (COMFY / 'input').mkdir(exist_ok=True)
-(APP / 'config.json').write_text(json.dumps({
+cfg_path = DATA / 'config.json'
+cfg = json.loads(cfg_path.read_text(encoding='utf-8')) if cfg_path.exists() else {}
+cfg.update({
     'comfy_url': 'http://127.0.0.1:8188',
     'comfy_input_dir': str(COMFY / 'input'),
     'skills_dir': '/content/t8-enhancer/directional_skills',
     'free_after_rewrite': True,   # Colab 記憶體比較小：改寫完就把 9B 模型卸載
-}, ensure_ascii=False, indent=1), encoding='utf-8')
-toybox = subprocess.Popen([sys.executable, 'server.py'], cwd=str(APP), env=dict(os.environ, H3TOYBOX_PORT='8190'),
+})
+cfg.pop('guides', None)
+cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=1), encoding='utf-8')
+secrets = DATA / 'secrets.json' if SAVE_API_KEYS else Path('/content/h3toybox_secrets.json')
+toybox = subprocess.Popen([sys.executable, 'server.py'], cwd=str(APP),
+                          env=dict(os.environ, H3TOYBOX_PORT='8190', H3TOYBOX_DATA=str(DATA), H3TOYBOX_SECRETS=str(secrets)),
                           stdout=open('/content/toybox.log', 'w'), stderr=subprocess.STDOUT)
 wait_http('http://127.0.0.1:8190/api/config', 'H3 Toybox', '/content/toybox.log', tries=30)
+print('📁 作品存放位置：', DATA)
 from google.colab import output
 output.serve_kernel_port_as_window(8190, anchor_text='🧸 打開 H3 Toybox')
 """),

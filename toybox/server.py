@@ -37,13 +37,17 @@ from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
-LIBRARY = ROOT / "library"
-OUTPUTS = ROOT / "outputs"
-CONFIG_PATH = ROOT / "config.json"
-JOBS_PATH = ROOT / "jobs.json"
-FOLDERS_PATH = ROOT / "library" / "folders.json"
-STATS_PATH = ROOT / "stats.json"
 TEMPLATE_PATH = ROOT / "WF.json"
+# Everything the user makes lives under DATA (Colab points it at Google Drive so a dropped runtime loses nothing).
+DATA = Path(os.environ.get("H3TOYBOX_DATA") or ROOT)
+LIBRARY = DATA / "library"
+OUTPUTS = DATA / "outputs"
+CONFIG_PATH = DATA / "config.json"
+JOBS_PATH = DATA / "jobs.json"
+FOLDERS_PATH = LIBRARY / "folders.json"
+STATS_PATH = DATA / "stats.json"
+# API keys are kept apart from the settings, so settings can sync to Drive while keys stay local.
+SECRETS_PATH = Path(os.environ.get("H3TOYBOX_SECRETS") or DATA / "secrets.json")
 PORT = int(os.environ.get("H3TOYBOX_PORT", 8190))
 FPS = 24
 
@@ -149,13 +153,18 @@ def deep_merge(base, extra):
     return base
 
 
+API_KEYS = (("rewriter", "gemini"), ("rewriter", "openai"))
+
+
 def load_config():
     saved = load_json(CONFIG_PATH, {})
     saved.pop("guide_path", None)  # H3 Studio's single-guide key
-    return deep_merge(copy.deepcopy(DEFAULT_CONFIG), saved)
-
-
-API_KEYS = (("rewriter", "gemini"), ("rewriter", "openai"))
+    cfg = deep_merge(copy.deepcopy(DEFAULT_CONFIG), saved)
+    secrets = load_json(SECRETS_PATH, {})
+    for a, b in API_KEYS:
+        if secrets.get(b):
+            cfg[a][b]["api_key"] = secrets[b]
+    return cfg
 
 
 def public_config(cfg):
@@ -178,7 +187,34 @@ def save_config(new):
             sect.pop("has_key", None)
             key = sect.get("api_key", "")
             sect["api_key"] = "" if key == "__CLEAR__" else key.strip() or old[a][b].get("api_key", "")
-    save_json(CONFIG_PATH, deep_merge(load_json(CONFIG_PATH, {}), new))
+    secrets = {}
+    for a, b in API_KEYS:
+        sect = new.get(a, {}).get(b)
+        key = sect.pop("api_key", "") if isinstance(sect, dict) else old[a][b].get("api_key", "")
+        if key:
+            secrets[b] = key
+    stored = deep_merge(load_json(CONFIG_PATH, {}), new)
+    for a, b in API_KEYS:  # keys written by older versions into config.json
+        stored.get(a, {}).get(b, {}).pop("api_key", None)
+    save_json(CONFIG_PATH, stored)
+    if secrets or SECRETS_PATH.exists():
+        SECRETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        save_json(SECRETS_PATH, secrets)
+
+
+def restore_inputs(cfg):
+    """Library assets also live in ComfyUI's input folder. A fresh runtime (or a new ComfyUI) starts with
+    that folder empty while the library on Drive is intact, so put the copies back before the first job."""
+    inp = Path(cfg["comfy_input_dir"])
+    if not inp.is_dir():
+        return 0
+    restored = 0
+    for item in library_index():
+        dest, src = inp / item["comfy_name"], LIBRARY / item["file"]
+        if not dest.exists() and src.exists():
+            shutil.copyfile(src, dest)
+            restored += 1
+    return restored
 
 
 # ---------------------------------------------------------------- ComfyUI client
@@ -1416,12 +1452,15 @@ def safe_child(base, rel):
 
 
 if __name__ == "__main__":
-    LIBRARY.mkdir(exist_ok=True)
-    OUTPUTS.mkdir(exist_ok=True)
+    LIBRARY.mkdir(parents=True, exist_ok=True)
+    OUTPUTS.mkdir(parents=True, exist_ok=True)
+    n = restore_inputs(load_config())
+    if n:
+        print(f"Restored {n} library files into ComfyUI's input folder")
     # Windows lets a second process bind the same port when SO_REUSEADDR is set; an old server
     # would then keep answering. Refuse instead, so a double start fails loudly.
     ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     MONITOR.start()
-    print(f"H3 Toybox running at http://127.0.0.1:{PORT}")
+    print(f"H3 Toybox running at http://127.0.0.1:{PORT}  (data: {DATA})")
     httpd.serve_forever()
